@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+env:
+  ENV: development
+
+dotenv: ['.env', '{{.ENV}}/.env', '{{.HOME}}/.env']
+
+tasks:
+  build:
+    desc: Build backend
+    dir: backend
+    cmds:
+      - go build -o ../bin/server ./cmd/server
+
+  run:
+    desc: Run backend
+    dir: backend
+    cmds:
+      - go run ./cmd/server
+
+  test-unit:
+    desc: Run backend unit tests 
+    dir: backend
+    cmds:
+      - go test -v
