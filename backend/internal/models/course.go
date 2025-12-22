@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,7 +30,7 @@ func NewCourse(
 }
 
 func (c *Course) Validate() error {
-	if c.Name == "" {
+	if strings.TrimSpace(c.Name) == "" {
 		return errors.New("name is required")
 	}
 
