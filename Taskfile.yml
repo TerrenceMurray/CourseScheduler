@@ -40,13 +40,13 @@ tasks:
       - migrate create -ext sql -dir migrations -seq {{.CLI_ARGS}}
 
   migrate-up:
-    desc: Run migrations on Supabase
+    desc: Run up migration on Supabase
     dir: backend
     cmds:
       - migrate -path migrations -database "$DATABASE_URL" up
 
   migrate-down:
-    desc: Run migrations on Supabase
+    desc: Run down migration on Supabase
     dir: backend
     cmds:
       - migrate -path migrations -database "$DATABASE_URL" down
