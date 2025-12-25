@@ -3,457 +3,161 @@ package main
 import (
 	"fmt"
 	"slices"
-	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/TerrenceMurray/course-scheduler/internal/models"
+	"github.com/TerrenceMurray/course-scheduler/internal/scheduler"
+	"github.com/TerrenceMurray/course-scheduler/internal/scheduler/greedy"
+	"github.com/TerrenceMurray/course-scheduler/internal/scheduler/greedy/weight"
 )
 
-type Room struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Type      string    `json:"type"`
-	Building  string    `json:"building"`
-	Capacity  uint      `json:"capacity"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type Course struct {
-	ID    uuid.UUID
-	Title string
-}
-
-type CourseWeight struct {
-	CourseID uuid.UUID
-	Weight   uint
-}
-
-type Session struct {
-	ID               uuid.UUID
-	CourseID         uuid.UUID
-	Type             string // (lab, tutorial, lecture)
-	Duration         uint   // in minutes
-	RequiredRoom     string // (chemistry_lab, computer_lab, lecture_room)
-	NumberOfSessions uint
-}
-
-type ScheduledSession struct {
-	CourseID  uuid.UUID
-	RoomID    uuid.UUID
-	DayOfWeek uint
-	StartTime string
-	EndTime   string
-}
-
-type TimeRange struct {
-	Start uint
-	End   uint
-}
-
-// Availability[room id][day of the week (0-6)] = [(int, int), ..., (int, int)]
-type Availability map[string]map[int][]TimeRange
+func ptr[T any](v T) *T { return &v }
 
 func main() {
-	var scheduledSessions []ScheduledSession = []ScheduledSession{}
-	var failedSessions []Session = []Session{}
-
-	var rooms []Room = []Room{
-		{
-			ID:        uuid.New(),
-			Name:      "FST 113",
-			Type:      "lecture_room",
-			Building:  "Natural Science Building",
-			Capacity:  150,
-			CreatedAt: time.Now(),
-		},
-		{
-			ID:        uuid.New(),
-			Name:      "CLT 201",
-			Type:      "computer_lab",
-			Building:  "Computing Building",
-			Capacity:  30,
-			CreatedAt: time.Now(),
-		},
-		{
-			ID:        uuid.New(),
-			Name:      "CHM 105",
-			Type:      "chemistry_lab",
-			Building:  "Natural Science Building",
-			Capacity:  25,
-			CreatedAt: time.Now(),
-		},
-		{
-			ID:        uuid.New(),
-			Name:      "ENG 302",
-			Type:      "tutorial_room",
-			Building:  "Engineering Building",
-			Capacity:  40,
-			CreatedAt: time.Now(),
-		},
-		{
-			ID:        uuid.New(),
-			Name:      "LIB 001",
-			Type:      "lecture_room",
-			Building:  "Library Building",
-			Capacity:  200,
-			CreatedAt: time.Now(),
-		},
-		// Additional rooms for increased capacity
-		{
-			ID:        uuid.New(),
-			Name:      "SCI 201",
-			Type:      "lecture_room",
-			Building:  "Science Building",
-			Capacity:  120,
-			CreatedAt: time.Now(),
-		},
-		{
-			ID:        uuid.New(),
-			Name:      "CLT 305",
-			Type:      "computer_lab",
-			Building:  "Computing Building",
-			Capacity:  35,
-			CreatedAt: time.Now(),
-		},
-		{
-			ID:        uuid.New(),
-			Name:      "BIO 102",
-			Type:      "biology_lab",
-			Building:  "Natural Science Building",
-			Capacity:  24,
-			CreatedAt: time.Now(),
-		},
-		{
-			ID:        uuid.New(),
-			Name:      "HUM 405",
-			Type:      "tutorial_room",
-			Building:  "Humanities Building",
-			Capacity:  35,
-			CreatedAt: time.Now(),
-		},
+	rooms := []*models.Room{
+		models.NewRoom(uuid.New(), "FST 113", "lecture_room", uuid.New(), 150, nil, nil),
+		models.NewRoom(uuid.New(), "CLT 201", "computer_lab", uuid.New(), 30, nil, nil),
+		models.NewRoom(uuid.New(), "CHM 105", "chemistry_lab", uuid.New(), 25, nil, nil),
+		models.NewRoom(uuid.New(), "ENG 302", "tutorial_room", uuid.New(), 40, nil, nil),
+		models.NewRoom(uuid.New(), "LIB 001", "lecture_room", uuid.New(), 200, nil, nil),
+		models.NewRoom(uuid.New(), "SCI 201", "lecture_room", uuid.New(), 120, nil, nil),
+		models.NewRoom(uuid.New(), "CLT 305", "computer_lab", uuid.New(), 35, nil, nil),
+		models.NewRoom(uuid.New(), "BIO 102", "biology_lab", uuid.New(), 24, nil, nil),
+		models.NewRoom(uuid.New(), "HUM 405", "tutorial_room", uuid.New(), 35, nil, nil),
 	}
 
-	var courses []Course = []Course{
-		{ID: uuid.New(), Title: "Introduction to Computer Science"},
-		{ID: uuid.New(), Title: "Organic Chemistry"},
-		{ID: uuid.New(), Title: "Calculus I"},
-		{ID: uuid.New(), Title: "Data Structures"},
-		{ID: uuid.New(), Title: "Physics 101"},
-		// Additional courses
-		{ID: uuid.New(), Title: "Biology 101"},
-		{ID: uuid.New(), Title: "English Literature"},
-		{ID: uuid.New(), Title: "Linear Algebra"},
-		{ID: uuid.New(), Title: "Microeconomics"},
-		{ID: uuid.New(), Title: "Introduction to Psychology"},
-		{ID: uuid.New(), Title: "World History"},
-		{ID: uuid.New(), Title: "Programming in Python"},
+	courses := []*models.Course{
+		models.NewCourse(uuid.New(), "Introduction to Computer Science", nil, nil),
+		models.NewCourse(uuid.New(), "Organic Chemistry", nil, nil),
+		models.NewCourse(uuid.New(), "Calculus I", nil, nil),
+		models.NewCourse(uuid.New(), "Data Structures", nil, nil),
+		models.NewCourse(uuid.New(), "Physics 101", nil, nil),
+		models.NewCourse(uuid.New(), "Biology 101", nil, nil),
+		models.NewCourse(uuid.New(), "English Literature", nil, nil),
+		models.NewCourse(uuid.New(), "Linear Algebra", nil, nil),
+		models.NewCourse(uuid.New(), "Microeconomics", nil, nil),
+		models.NewCourse(uuid.New(), "Introduction to Psychology", nil, nil),
+		models.NewCourse(uuid.New(), "World History", nil, nil),
+		models.NewCourse(uuid.New(), "Programming in Python", nil, nil),
 	}
 
-	var sessions []Session = []Session{
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[0].ID,
-			Type:             "lecture",
-			Duration:         60,
-			RequiredRoom:     "lecture_room",
-			NumberOfSessions: 2,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[0].ID,
-			Type:             "lab",
-			Duration:         120,
-			RequiredRoom:     "computer_lab",
-			NumberOfSessions: 1,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[1].ID,
-			Type:             "lecture",
-			Duration:         60,
-			RequiredRoom:     "lecture_room",
-			NumberOfSessions: 2,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[1].ID,
-			Type:             "lab",
-			Duration:         90,
-			RequiredRoom:     "chemistry_lab",
-			NumberOfSessions: 1,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[2].ID,
-			Type:             "lecture",
-			Duration:         90,
-			RequiredRoom:     "lecture_room",
-			NumberOfSessions: 3,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[2].ID,
-			Type:             "tutorial",
-			Duration:         45,
-			RequiredRoom:     "tutorial_room",
-			NumberOfSessions: 2,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[3].ID,
-			Type:             "lecture",
-			Duration:         60,
-			RequiredRoom:     "lecture_room",
-			NumberOfSessions: 2,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[3].ID,
-			Type:             "lab",
-			Duration:         120,
-			RequiredRoom:     "computer_lab",
-			NumberOfSessions: 1,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[4].ID,
-			Type:             "lecture",
-			Duration:         90,
-			RequiredRoom:     "lecture_room",
-			NumberOfSessions: 2,
-		},
-		// Biology 101 - lectures + biology lab
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[5].ID,
-			Type:             "lecture",
-			Duration:         60,
-			RequiredRoom:     "lecture_room",
-			NumberOfSessions: 3,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[5].ID,
-			Type:             "lab",
-			Duration:         120,
-			RequiredRoom:     "biology_lab",
-			NumberOfSessions: 1,
-		},
-		// English Literature - lectures + tutorial
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[6].ID,
-			Type:             "lecture",
-			Duration:         75,
-			RequiredRoom:     "lecture_room",
-			NumberOfSessions: 2,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[6].ID,
-			Type:             "tutorial",
-			Duration:         60,
-			RequiredRoom:     "tutorial_room",
-			NumberOfSessions: 1,
-		},
-		// Linear Algebra - lectures + tutorial
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[7].ID,
-			Type:             "lecture",
-			Duration:         90,
-			RequiredRoom:     "lecture_room",
-			NumberOfSessions: 2,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[7].ID,
-			Type:             "tutorial",
-			Duration:         45,
-			RequiredRoom:     "tutorial_room",
-			NumberOfSessions: 2,
-		},
-		// Microeconomics - lectures only
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[8].ID,
-			Type:             "lecture",
-			Duration:         90,
-			RequiredRoom:     "lecture_room",
-			NumberOfSessions: 3,
-		},
-		// Introduction to Psychology - lectures + lab
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[9].ID,
-			Type:             "lecture",
-			Duration:         60,
-			RequiredRoom:     "lecture_room",
-			NumberOfSessions: 2,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[9].ID,
-			Type:             "lab",
-			Duration:         90,
-			RequiredRoom:     "computer_lab",
-			NumberOfSessions: 1,
-		},
-		// World History - lectures + tutorial
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[10].ID,
-			Type:             "lecture",
-			Duration:         75,
-			RequiredRoom:     "lecture_room",
-			NumberOfSessions: 2,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[10].ID,
-			Type:             "tutorial",
-			Duration:         45,
-			RequiredRoom:     "tutorial_room",
-			NumberOfSessions: 1,
-		},
-		// Programming in Python - lectures + computer lab
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[11].ID,
-			Type:             "lecture",
-			Duration:         60,
-			RequiredRoom:     "lecture_room",
-			NumberOfSessions: 2,
-		},
-		{
-			ID:               uuid.New(),
-			CourseID:         courses[11].ID,
-			Type:             "lab",
-			Duration:         120,
-			RequiredRoom:     "computer_lab",
-			NumberOfSessions: 2,
-		},
+	sessions := []*models.CourseSession{
+		// Introduction to Computer Science
+		models.NewCourseSession(uuid.New(), courses[0].ID, "lecture_room", "lecture", ptr(int32(60)), ptr(int32(2)), nil, nil),
+		models.NewCourseSession(uuid.New(), courses[0].ID, "computer_lab", "lab", ptr(int32(120)), ptr(int32(1)), nil, nil),
+		// Organic Chemistry
+		models.NewCourseSession(uuid.New(), courses[1].ID, "lecture_room", "lecture", ptr(int32(60)), ptr(int32(2)), nil, nil),
+		models.NewCourseSession(uuid.New(), courses[1].ID, "chemistry_lab", "lab", ptr(int32(90)), ptr(int32(1)), nil, nil),
+		// Calculus I
+		models.NewCourseSession(uuid.New(), courses[2].ID, "lecture_room", "lecture", ptr(int32(90)), ptr(int32(3)), nil, nil),
+		models.NewCourseSession(uuid.New(), courses[2].ID, "tutorial_room", "tutorial", ptr(int32(45)), ptr(int32(2)), nil, nil),
+		// Data Structures
+		models.NewCourseSession(uuid.New(), courses[3].ID, "lecture_room", "lecture", ptr(int32(60)), ptr(int32(2)), nil, nil),
+		models.NewCourseSession(uuid.New(), courses[3].ID, "computer_lab", "lab", ptr(int32(120)), ptr(int32(1)), nil, nil),
+		// Physics 101
+		models.NewCourseSession(uuid.New(), courses[4].ID, "lecture_room", "lecture", ptr(int32(90)), ptr(int32(2)), nil, nil),
+		// Biology 101
+		models.NewCourseSession(uuid.New(), courses[5].ID, "lecture_room", "lecture", ptr(int32(60)), ptr(int32(3)), nil, nil),
+		models.NewCourseSession(uuid.New(), courses[5].ID, "biology_lab", "lab", ptr(int32(120)), ptr(int32(1)), nil, nil),
+		// English Literature
+		models.NewCourseSession(uuid.New(), courses[6].ID, "lecture_room", "lecture", ptr(int32(75)), ptr(int32(2)), nil, nil),
+		models.NewCourseSession(uuid.New(), courses[6].ID, "tutorial_room", "tutorial", ptr(int32(60)), ptr(int32(1)), nil, nil),
+		// Linear Algebra
+		models.NewCourseSession(uuid.New(), courses[7].ID, "lecture_room", "lecture", ptr(int32(90)), ptr(int32(2)), nil, nil),
+		models.NewCourseSession(uuid.New(), courses[7].ID, "tutorial_room", "tutorial", ptr(int32(45)), ptr(int32(2)), nil, nil),
+		// Microeconomics
+		models.NewCourseSession(uuid.New(), courses[8].ID, "lecture_room", "lecture", ptr(int32(90)), ptr(int32(3)), nil, nil),
+		// Introduction to Psychology
+		models.NewCourseSession(uuid.New(), courses[9].ID, "lecture_room", "lecture", ptr(int32(60)), ptr(int32(2)), nil, nil),
+		models.NewCourseSession(uuid.New(), courses[9].ID, "computer_lab", "lab", ptr(int32(90)), ptr(int32(1)), nil, nil),
+		// World History
+		models.NewCourseSession(uuid.New(), courses[10].ID, "lecture_room", "lecture", ptr(int32(75)), ptr(int32(2)), nil, nil),
+		models.NewCourseSession(uuid.New(), courses[10].ID, "tutorial_room", "tutorial", ptr(int32(45)), ptr(int32(1)), nil, nil),
+		// Programming in Python
+		models.NewCourseSession(uuid.New(), courses[11].ID, "lecture_room", "lecture", ptr(int32(60)), ptr(int32(2)), nil, nil),
+		models.NewCourseSession(uuid.New(), courses[11].ID, "computer_lab", "lab", ptr(int32(120)), ptr(int32(2)), nil, nil),
 	}
 
-	avail := initAvailability(rooms)
-	courseWeights := initWeights(courses, sessions)
+	// Create scheduler with TotalTimeWeight strategy
+	sched := greedy.NewGreedyScheduler(&weight.TotalTimeWeight{})
 
-	// 1. Sort course weights (desc)
-	sortWeightedCourses(courseWeights)
-
-	// 2. Get sessions ordered by course weight
-	orderedSessions := getSessionsByWeightedCourses(courseWeights, sessions)
-
-	// Track days used per course (across all session types)
-	courseDaysUsed := make(map[string][]int)
-
-	// 3. Schedule each session
-	for _, session := range orderedSessions {
-		sessionsToPlace := session.NumberOfSessions
-		courseKey := session.CourseID.String()
-
-		// Initialize if not exists
-		if _, exists := courseDaysUsed[courseKey]; !exists {
-			courseDaysUsed[courseKey] = []int{}
-		}
-
-		for sessionsToPlace > 0 {
-			candidateDays := sortDaysByAvailabilityAndRoom(avail, rooms, session.RequiredRoom)
-			sessionPlaced := false
-
-			for _, day := range candidateDays {
-				if sessionPlaced {
-					break
-				}
-
-				// Try to spread sessions across different days for the same course
-				if slices.Contains(courseDaysUsed[courseKey], day) && int(sessionsToPlace) <= (5-len(courseDaysUsed[courseKey])) {
-					continue
-				}
-
-				for _, room := range roomsByType(rooms, session.RequiredRoom) {
-					start, found := findFirstAvailableSlot(avail[room.ID.String()][day], int(session.Duration))
-
-					if found {
-						end := start + int(session.Duration)
-						avail[room.ID.String()][day] = consumeSlot(avail[room.ID.String()][day], start, end)
-						courseDaysUsed[courseKey] = append(courseDaysUsed[courseKey], day)
-
-						scheduledSessions = append(scheduledSessions, ScheduledSession{
-							CourseID:  session.CourseID,
-							RoomID:    room.ID,
-							DayOfWeek: uint(day),
-							StartTime: minsToTime(start),
-							EndTime:   minsToTime(end),
-						})
-
-						sessionsToPlace--
-						sessionPlaced = true
-						break
-					}
-				}
-			}
-
-			// If we tried all days and couldn't place the session, mark as failed
-			if !sessionPlaced {
-				failedSessions = append(failedSessions, session)
-				break
-			}
-		}
+	// Configure scheduler
+	config := &scheduler.Config{
+		OperatingHours: scheduler.TimeRange{
+			Start: 480,  // 8:00 AM
+			End:   1260, // 9:00 PM
+		},
+		OperatingDays:           []scheduler.Day{scheduler.Monday, scheduler.Tuesday, scheduler.Wednesday, scheduler.Thursday, scheduler.Friday},
+		MinBreakBetweenSessions: 10, // 10-minute break between sessions
+		PreferredSlotDuration:   30, // Align to 30-minute slots
 	}
 
-	printCalendar(scheduledSessions, courses, rooms)
+	// Generate schedule
+	output, err := sched.Generate(&scheduler.Input{
+		Config:         config,
+		Rooms:          rooms,
+		Courses:        courses,
+		CourseSessions: sessions,
+	})
+	if err != nil {
+		fmt.Printf("Error generating schedule: %v\n", err)
+		return
+	}
 
-	if len(failedSessions) > 0 {
+	// Print results
+	printCalendar(output.ScheduledSessions, courses, rooms)
+
+	if len(output.Failures) > 0 {
 		fmt.Println("\n⚠️  Failed to schedule:")
-		for _, s := range failedSessions {
-			course := findCourse(courses, s.CourseID)
-			fmt.Printf("  - %s (%s, %d min)\n", course.Title, s.Type, s.Duration)
+		for _, f := range output.Failures {
+			course := findCourse(courses, f.CourseSession.CourseID)
+			fmt.Printf("  - %s (%s, %d min): %s\n", course.Name, f.CourseSession.Type, *f.CourseSession.Duration, f.Reason)
 		}
 	}
+
+	fmt.Printf("\nScheduler config:\n")
+	fmt.Printf("  Operating hours: %s - %s\n", minsToTime(config.OperatingHours.Start), minsToTime(config.OperatingHours.End))
+	fmt.Printf("  Min break between sessions: %d min\n", config.MinBreakBetweenSessions)
+	fmt.Printf("  Preferred slot duration: %d min\n", config.PreferredSlotDuration)
 }
 
-func findCourse(courses []Course, id uuid.UUID) Course {
+func findCourse(courses []*models.Course, id uuid.UUID) *models.Course {
 	for _, c := range courses {
 		if c.ID == id {
 			return c
 		}
 	}
-	return Course{}
+	return nil
 }
 
-func findRoom(rooms []Room, id uuid.UUID) Room {
+func findRoom(rooms []*models.Room, id uuid.UUID) *models.Room {
 	for _, r := range rooms {
 		if r.ID == id {
 			return r
 		}
 	}
-	return Room{}
+	return nil
 }
 
-func printCalendar(scheduled []ScheduledSession, courses []Course, rooms []Room) {
+func printCalendar(scheduled []*models.ScheduledSession, courses []*models.Course, rooms []*models.Room) {
 	days := []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday"}
 
-	fmt.Println("\n" + "═" + repeatStr("═", 90))
+	fmt.Println("\n" + repeatStr("═", 91))
 	fmt.Println("  WEEKLY SCHEDULE")
-	fmt.Println("═" + repeatStr("═", 90))
+	fmt.Println(repeatStr("═", 91))
 
 	for dayIdx, dayName := range days {
-		daySessions := []ScheduledSession{}
+		daySessions := []*models.ScheduledSession{}
 		for _, s := range scheduled {
-			if s.DayOfWeek == uint(dayIdx) {
+			if s.Day == dayIdx {
 				daySessions = append(daySessions, s)
 			}
 		}
 
 		// Sort by start time
-		slices.SortFunc(daySessions, func(a, b ScheduledSession) int {
-			if a.StartTime < b.StartTime {
-				return -1
-			}
-			if a.StartTime > b.StartTime {
-				return 1
-			}
-			return 0
+		slices.SortFunc(daySessions, func(a, b *models.ScheduledSession) int {
+			return a.StartTime - b.StartTime
 		})
 
 		fmt.Printf("\n📅 %s\n", dayName)
@@ -465,159 +169,32 @@ func printCalendar(scheduled []ScheduledSession, courses []Course, rooms []Room)
 			for _, s := range daySessions {
 				course := findCourse(courses, s.CourseID)
 				room := findRoom(rooms, s.RoomID)
+				courseName := "Unknown"
+				roomName := "Unknown"
+				if course != nil {
+					courseName = course.Name
+				}
+				if room != nil {
+					roomName = room.Name
+				}
 				fmt.Printf("   %s - %s  │  %-30s  │  %s\n",
-					s.StartTime, s.EndTime, course.Title, room.Name)
+					minsToTime(s.StartTime), minsToTime(s.EndTime), courseName, roomName)
 			}
 		}
 	}
 
-	fmt.Println("\n" + "═" + repeatStr("═", 90))
+	fmt.Println("\n" + repeatStr("═", 91))
 	fmt.Printf("Total sessions scheduled: %d\n", len(scheduled))
 }
 
 func repeatStr(s string, n int) string {
 	result := ""
-	for i := 0; i < n; i++ {
+	for range n {
 		result += s
 	}
 	return result
 }
 
-func findFirstAvailableSlot(ranges []TimeRange, duration int) (start int, found bool) {
-	for _, r := range ranges {
-		if r.End-r.Start >= uint(duration) {
-			return int(r.Start), true
-		}
-	}
-	return 0, false
-}
-
-func consumeSlot(ranges []TimeRange, start, end int) []TimeRange {
-	var result []TimeRange
-	for _, r := range ranges {
-		if r.End <= uint(start) || r.Start >= uint(end) {
-			result = append(result, r)
-		} else {
-			if r.Start < uint(start) {
-				result = append(result, TimeRange{r.Start, uint(start)})
-			}
-
-			if r.End > uint(end) {
-				result = append(result, TimeRange{uint(end), r.End})
-			}
-		}
-	}
-	return result
-}
-
-func initAvailability(rooms []Room) Availability {
-	availability := make(Availability)
-	for _, room := range rooms {
-		availability[room.ID.String()] = make(map[int][]TimeRange)
-		for day := 0; day < 5; day++ {
-			// 08:00 (480 mins) to 21:00 (1260 mins)
-			availability[room.ID.String()][day] = []TimeRange{{Start: 480, End: 1260}}
-		}
-	}
-
-	return availability
-}
-
-func initWeights(courses []Course, sessions []Session) []CourseWeight {
-	weights := make([]CourseWeight, len(courses))
-
-	for i, course := range courses {
-		weights[i] = CourseWeight{
-			CourseID: course.ID,
-			Weight:   calculateSessionWeight(course.ID, sessions),
-		}
-	}
-
-	return weights
-}
-
-func calculateSessionWeight(courseID uuid.UUID, sessions []Session) uint {
-	var weight uint = 0
-
-	for _, session := range sessions {
-		if session.CourseID != courseID {
-			continue
-		}
-
-		weight += session.Duration * session.NumberOfSessions
-	}
-
-	return weight
-}
-
-func sortWeightedCourses(wc []CourseWeight) {
-	slices.SortFunc(wc, func(a, b CourseWeight) int {
-		return int(b.Weight) - int(a.Weight)
-	})
-}
-
-func getSessionsByWeightedCourses(weights []CourseWeight, sessions []Session) []Session {
-	var ordered []Session
-
-	for _, cw := range weights {
-		for _, session := range sessions {
-			if session.CourseID == cw.CourseID {
-				ordered = append(ordered, session)
-			}
-		}
-	}
-
-	return ordered
-}
-
-func sortDaysByAvailabilityAndRoom(avail Availability, rooms []Room, roomType string) []int {
-	roomsOfType := roomsByType(rooms, roomType)
-
-	days := []int{0, 1, 2, 3, 4}
-	slices.SortFunc(days, func(a, b int) int {
-		availA := getTotalAvailability(avail, roomsOfType, a)
-		availB := getTotalAvailability(avail, roomsOfType, b)
-		// Sort descending (most availability first)
-		return int(availB) - int(availA)
-	})
-
-	return days
-}
-
-func roomsByType(rooms []Room, roomType string) []Room {
-	roomsOfType := []Room{}
-
-	for _, room := range rooms {
-		if room.Type == roomType {
-			roomsOfType = append(roomsOfType, room)
-		}
-	}
-	return roomsOfType
-}
-
-func getTotalAvailability(avail Availability, rooms []Room, day int) uint {
-	var total uint = 0
-
-	for _, room := range rooms {
-		roomAvail, exists := avail[room.ID.String()]
-		if !exists {
-			continue
-		}
-
-		dayRanges, exists := roomAvail[day]
-		if !exists {
-			continue
-		}
-
-		for _, timeRange := range dayRanges {
-			total += timeRange.End - timeRange.Start
-		}
-	}
-
-	return total
-}
-
-// Helper: convert minutes to "HH:MM" string
 func minsToTime(mins int) string {
 	return fmt.Sprintf("%02d:%02d", mins/60, mins%60)
 }
