@@ -10,6 +10,7 @@ A web application for scheduling university courses into available rooms while r
 
 - **Room Management** — Add rooms with type (lab, classroom, lecture hall), building, and capacity
 - **Course Management** — Define courses with session types, durations, and weekly frequency
+- **Automatic Scheduling** — Greedy algorithm assigns sessions to rooms based on availability
 - **Conflict Detection** — Prevents double-booking rooms and validates room type requirements
 - **Schedule Views** — View timetables by course, room, or building
 - **Data Import** — Bulk import rooms and courses via CSV
@@ -18,15 +19,28 @@ A web application for scheduling university courses into available rooms while r
 
 | Layer | Technology |
 |-------|------------|
-| Backend | Go |
+| Backend | Go + Chi router |
 | Database | PostgreSQL (Supabase) |
+| ORM | Go-Jet (type-safe SQL) |
 | Frontend | React + Vite |
+
+## API Endpoints
+
+| Resource | Endpoints |
+|----------|-----------|
+| Buildings | `GET/POST /api/v1/buildings`, `GET/PUT/DELETE /api/v1/buildings/{id}` |
+| Courses | `GET/POST /api/v1/courses`, `GET/PUT/DELETE /api/v1/courses/{id}` |
+| Sessions | `GET/POST /api/v1/sessions`, `GET/PUT/DELETE /api/v1/sessions/{id}` |
+| Rooms | `GET/POST /api/v1/rooms`, `GET/PUT/DELETE /api/v1/rooms/{id}` |
+| Room Types | `GET/POST /api/v1/room-types`, `GET/PUT/DELETE /api/v1/room-types/{name}` |
+| Schedules | `GET/POST /api/v1/schedules`, `GET/PUT/DELETE /api/v1/schedules/{id}` |
+| Scheduler | `POST /api/v1/scheduler/generate`, `POST /api/v1/scheduler/generate-and-save` |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.22+
 - Node.js 18+
 - PostgreSQL (or [Supabase](https://supabase.com) free tier)
 - [Task](https://taskfile.dev) — task runner
@@ -83,11 +97,10 @@ Run `task --list` to see all commands:
 
 ### Environment Variables
 
-Create a `.env` file in the project root:
-
-```bash
-DATABASE_URL=postgres://user:password@host:port/database?sslmode=require
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgres://localhost:5432/scheduler?sslmode=disable` |
+| `BACKEND_ADDRESS` | Server listen address | `:8080` |
 
 For Supabase, use the **pooler** connection string from Settings > Database.
 
@@ -95,13 +108,19 @@ For Supabase, use the **pooler** connection string from Settings > Database.
 
 ```
 course-scheduler/
+├── .github/workflows/    # CI/CD
+│   └── test.yml          # Test workflow
 ├── backend/
 │   ├── cmd/server/       # Entry point
 │   └── internal/
-│       ├── models/       # Data models
-│       ├── database/     # PostgreSQL operations
+│       ├── app/          # Application bootstrap
 │       ├── handlers/     # HTTP handlers
-│       └── scheduler/    # Scheduling algorithm
+│       ├── models/       # Domain models
+│       ├── repository/   # Data access layer
+│       ├── service/      # Business logic
+│       ├── scheduler/    # Scheduling algorithm
+│       │   └── greedy/   # Greedy scheduler implementation
+│       └── tests/        # Unit & integration tests
 ├── frontend/
 │   └── src/
 │       ├── components/   # Reusable UI components
@@ -109,6 +128,48 @@ course-scheduler/
 │       └── api/          # API client
 └── README.md
 ```
+
+## Architecture
+
+```
+HTTP Request
+     │
+     ▼
+┌─────────────┐
+│  Handlers   │  Parse request, validate input, return JSON
+└─────────────┘
+     │
+     ▼
+┌─────────────┐
+│  Services   │  Business logic, orchestration
+└─────────────┘
+     │
+     ▼
+┌─────────────┐
+│ Repositories│  Database operations (Go-Jet)
+└─────────────┘
+     │
+     ▼
+┌─────────────┐
+│ PostgreSQL  │
+└─────────────┘
+```
+
+## Scheduling Algorithm
+
+The scheduler uses a **greedy algorithm** to assign course sessions to rooms:
+
+1. **Weight courses** by total session time (longer courses scheduled first)
+2. **Sort days** by available capacity for the required room type
+3. **Find first available slot** that fits the session duration
+4. **Spread sessions** across different days for the same course
+5. **Track failures** for sessions that couldn't be scheduled
+
+Configuration options:
+- `OperatingHours` — Start/end time (default: 8AM-9PM)
+- `OperatingDays` — Which days to schedule (default: Mon-Fri)
+- `MinBreakBetweenSessions` — Gap between sessions (for travel time)
+- `PreferredSlotDuration` — Align to hourly slots
 
 ## Status
 
