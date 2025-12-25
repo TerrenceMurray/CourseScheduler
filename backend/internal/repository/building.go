@@ -10,6 +10,7 @@ import (
 	"github.com/TerrenceMurray/course-scheduler/internal/database/postgres/scheduler/table"
 	"github.com/TerrenceMurray/course-scheduler/internal/models"
 	. "github.com/go-jet/jet/v2/postgres"
+	"github.com/go-jet/jet/v2/qrm"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -22,6 +23,7 @@ type BuildingRepositoryInterface interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Building, error)
 	List(ctx context.Context) ([]models.Building, error) // TODO: Update to pointer
 	Delete(ctx context.Context, id uuid.UUID) error
+	Update(ctx context.Context, id uuid.UUID, updates *models.BuildingUpdate) (*models.Building, error)
 }
 
 type BuildingRepository struct {
@@ -64,7 +66,7 @@ func (b *BuildingRepository) Create(ctx context.Context, building *models.Buildi
 		return nil, fmt.Errorf("failed to insert building: %w", err)
 	}
 
-	return models.NewBuilding(dest.ID, dest.Name), nil
+	return models.NewBuilding(dest.ID, dest.Name, dest.CreatedAt, dest.UpdatedAt), nil
 }
 
 func (b *BuildingRepository) CreateBatch(ctx context.Context, buildings []*models.Building) ([]*models.Building, error) {
@@ -104,7 +106,7 @@ func (b *BuildingRepository) CreateBatch(ctx context.Context, buildings []*model
 			return nil, fmt.Errorf("failed to create building: %w", err)
 		}
 
-		newBuildings = append(newBuildings, models.NewBuilding(dest.ID, dest.Name))
+		newBuildings = append(newBuildings, models.NewBuilding(dest.ID, dest.Name, dest.CreatedAt, dest.UpdatedAt))
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -124,14 +126,14 @@ func (b *BuildingRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 	err := stmt.QueryContext(ctx, b.db, &dest)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, qrm.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		b.logger.Error("failed to get building", zap.Error(err), zap.String("id", id.String()))
 		return nil, fmt.Errorf("failed to get building: %w", err)
 	}
 
-	return models.NewBuilding(dest.ID, dest.Name), nil
+	return models.NewBuilding(dest.ID, dest.Name, dest.CreatedAt, dest.UpdatedAt), nil
 }
 
 func (b *BuildingRepository) List(ctx context.Context) ([]models.Building, error) {
@@ -150,8 +152,10 @@ func (b *BuildingRepository) List(ctx context.Context) ([]models.Building, error
 	buildings := make([]models.Building, len(dest))
 	for i, d := range dest {
 		buildings[i] = models.Building{
-			ID:   d.ID,
-			Name: d.Name,
+			ID:        d.ID,
+			Name:      d.Name,
+			CreatedAt: d.CreatedAt,
+			UpdatedAt: d.UpdatedAt,
 		}
 	}
 
@@ -183,4 +187,42 @@ func (b *BuildingRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 
 	return nil
+}
+
+func (b *BuildingRepository) Update(ctx context.Context, id uuid.UUID, updates *models.BuildingUpdate) (*models.Building, error) {
+	if updates == nil {
+		return nil, errors.New("updates cannot be nil")
+	}
+
+	if err := updates.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
+	var columns ColumnList
+	if updates.Name != nil {
+		columns = append(columns, table.Buildings.Name)
+	}
+
+	if len(columns) == 0 {
+		return nil, errors.New("no fields to update")
+	}
+
+	updateStmt := table.Buildings.
+		UPDATE(columns).
+		MODEL(updates).
+		WHERE(table.Buildings.ID.EQ(UUID(id))).
+		RETURNING(table.Buildings.AllColumns)
+
+	var dest model.Buildings
+	err := updateStmt.QueryContext(ctx, b.db, &dest)
+
+	if err != nil {
+		if errors.Is(err, qrm.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		b.logger.Error("failed to update building", zap.Error(err), zap.String("id", id.String()))
+		return nil, fmt.Errorf("failed to update building: %w", err)
+	}
+
+	return models.NewBuilding(dest.ID, dest.Name, dest.CreatedAt, dest.UpdatedAt), nil
 }

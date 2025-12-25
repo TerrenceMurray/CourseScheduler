@@ -9,9 +9,12 @@ package model
 
 import (
 	"github.com/google/uuid"
+	"time"
 )
 
 type Buildings struct {
-	ID   uuid.UUID `sql:"primary_key"`
-	Name string
+	ID        uuid.UUID `sql:"primary_key"`
+	Name      string
+	CreatedAt *time.Time
+	UpdatedAt *time.Time
 }

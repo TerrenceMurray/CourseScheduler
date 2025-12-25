@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -24,8 +25,21 @@ func NewRoomType(
 }
 
 func (r *RoomType) Validate() error {
-	if r.Name == "" {
+	if strings.TrimSpace(r.Name) == "" {
 		return errors.New("name is required")
+	}
+
+	return nil
+}
+
+// UpdateRoomType
+type UpdateRoomType struct {
+	Name *string `json:"name,omitempty"`
+}
+
+func (u *UpdateRoomType) Validate() error {
+	if u.Name != nil && strings.TrimSpace(*u.Name) == "" {
+		return errors.New("name cannot be empty")
 	}
 
 	return nil

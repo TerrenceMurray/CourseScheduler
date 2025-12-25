@@ -9,6 +9,7 @@ package model
 
 import (
 	"github.com/google/uuid"
+	"time"
 )
 
 // Defines scheduling requirements for each course (e.g., "Calculus I needs 2 lectures and 1 tutorial per week")
@@ -19,4 +20,6 @@ type CourseSessions struct {
 	Type             CourseSessionType // Session type: lecture, lab, or tutorial
 	Duration         *int32            // Session length in minutes
 	NumberOfSessions *int32            // How many times per week this session occurs
+	CreatedAt        *time.Time
+	UpdatedAt        *time.Time
 }

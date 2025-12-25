@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/TerrenceMurray/course-scheduler/internal/models"
@@ -59,7 +58,7 @@ func (s *BuildingRepositorySuite) TestCreateBuilding_ValidationError() {
 
 // TestGetByID
 func (s *BuildingRepositorySuite) TestGetByID_Success() {
-	expected, err := s.repo.Create(s.ctx, models.NewBuilding(uuid.New(), "Building 1"))
+	expected, err := s.repo.Create(s.ctx, models.NewBuilding(uuid.New(), "Building 1", nil, nil))
 
 	actual, err := s.repo.GetByID(s.ctx, expected.ID)
 
@@ -69,17 +68,16 @@ func (s *BuildingRepositorySuite) TestGetByID_Success() {
 }
 
 func (s *BuildingRepositorySuite) TestGetByID_NotFoundError() {
-	expectedErr := errors.New("failed to get building: qrm: no rows in result set")
+	_, err := s.repo.GetByID(s.ctx, uuid.New())
 
-	_, actualErr := s.repo.GetByID(s.ctx, uuid.New())
-
-	s.Require().Equal(expectedErr.Error(), actualErr.Error())
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, repository.ErrNotFound)
 }
 
 // TestList
 func (s *BuildingRepositorySuite) TestList_Success() {
-	expected1, _ := s.repo.Create(s.ctx, models.NewBuilding(uuid.New(), "Building 1"))
-	expected2, _ := s.repo.Create(s.ctx, models.NewBuilding(uuid.New(), "Building 2"))
+	expected1, _ := s.repo.Create(s.ctx, models.NewBuilding(uuid.New(), "Building 1", nil, nil))
+	expected2, _ := s.repo.Create(s.ctx, models.NewBuilding(uuid.New(), "Building 2", nil, nil))
 
 	actual, err := s.repo.List(s.ctx)
 
@@ -99,8 +97,8 @@ func (s *BuildingRepositorySuite) TestList_Empty() {
 
 func (s *BuildingRepositorySuite) TestCreateBatch_Success() {
 	expected := []*models.Building{
-		models.NewBuilding(uuid.New(), "Building 1"),
-		models.NewBuilding(uuid.New(), "Building 2"),
+		models.NewBuilding(uuid.New(), "Building 1", nil, nil),
+		models.NewBuilding(uuid.New(), "Building 2", nil, nil),
 	}
 
 	actual, err := s.repo.CreateBatch(s.ctx, expected)
@@ -116,8 +114,8 @@ func (s *BuildingRepositorySuite) TestCreateBatch_Success() {
 
 func (s *BuildingRepositorySuite) TestCreateBatch_ValidationError() {
 	expected := []*models.Building{
-		models.NewBuilding(uuid.New(), " "),
-		models.NewBuilding(uuid.New(), "Building 2"),
+		models.NewBuilding(uuid.New(), " ", nil, nil),
+		models.NewBuilding(uuid.New(), "Building 2", nil, nil),
 	}
 
 	actual, err := s.repo.CreateBatch(s.ctx, expected)
@@ -129,8 +127,8 @@ func (s *BuildingRepositorySuite) TestCreateBatch_ValidationError() {
 
 func (s *BuildingRepositorySuite) TestCreateBatch_RollbackOnError() {
 	buildings := []*models.Building{
-		models.NewBuilding(uuid.New(), "Building 1"),
-		models.NewBuilding(uuid.New(), " "),
+		models.NewBuilding(uuid.New(), "Building 1", nil, nil),
+		models.NewBuilding(uuid.New(), " ", nil, nil),
 	}
 
 	_, createErr := s.repo.CreateBatch(s.ctx, buildings)
@@ -144,7 +142,7 @@ func (s *BuildingRepositorySuite) TestCreateBatch_RollbackOnError() {
 
 // TestDelete
 func (s *BuildingRepositorySuite) TestDelete_Success() {
-	building, createErr := s.repo.Create(s.ctx, models.NewBuilding(uuid.New(), "Building 1"))
+	building, createErr := s.repo.Create(s.ctx, models.NewBuilding(uuid.New(), "Building 1", nil, nil))
 
 	err := s.repo.Delete(s.ctx, building.ID)
 
@@ -161,8 +159,49 @@ func (s *BuildingRepositorySuite) TestDelete_NotFound() {
 	err := s.repo.Delete(s.ctx, uuid.New())
 
 	s.Require().Error(err)
-	s.Require().NotNil(err)
-	s.Require().ErrorContains(err, repository.ErrNotFound.Error())
+	s.Require().ErrorIs(err, repository.ErrNotFound)
+}
+
+// TestUpdate
+func (s *BuildingRepositorySuite) TestUpdate_Success() {
+	building, _ := s.repo.Create(s.ctx, models.NewBuilding(uuid.New(), "Building 1", nil, nil))
+
+	newName := "Updated Building"
+	updates := &models.BuildingUpdate{
+		Name: &newName,
+	}
+
+	actual, err := s.repo.Update(s.ctx, building.ID, updates)
+
+	s.Require().NoError(err)
+	s.Require().Equal(building.ID, actual.ID)
+	s.Require().Equal(newName, actual.Name)
+}
+
+func (s *BuildingRepositorySuite) TestUpdate_NotFound() {
+	newName := "Updated Building"
+	updates := &models.BuildingUpdate{
+		Name: &newName,
+	}
+
+	_, err := s.repo.Update(s.ctx, uuid.New(), updates)
+
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, repository.ErrNotFound)
+}
+
+func (s *BuildingRepositorySuite) TestUpdate_ValidationError() {
+	building, _ := s.repo.Create(s.ctx, models.NewBuilding(uuid.New(), "Building 1", nil, nil))
+
+	emptyName := " "
+	updates := &models.BuildingUpdate{
+		Name: &emptyName,
+	}
+
+	_, err := s.repo.Update(s.ctx, building.ID, updates)
+
+	s.Require().Error(err)
+	s.Require().ErrorContains(err, "validation failed")
 }
 
 // TestBuildingRepositorySuite

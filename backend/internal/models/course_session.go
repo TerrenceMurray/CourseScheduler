@@ -26,7 +26,7 @@ func NewCourseSession(
 	id uuid.UUID,
 	courseID uuid.UUID,
 	requiredRoom string,
-	_type string,
+	sessionType string,
 	duration *int32,
 	numberOfSessions *int32,
 ) *CourseSession {
@@ -34,7 +34,7 @@ func NewCourseSession(
 		ID:               id,
 		CourseID:         courseID,
 		RequiredRoom:     requiredRoom,
-		Type:             _type,
+		Type:             sessionType,
 		Duration:         duration,
 		NumberOfSessions: numberOfSessions,
 	}

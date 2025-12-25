@@ -17,8 +17,10 @@ type buildingsTable struct {
 	postgres.Table
 
 	// Columns
-	ID   postgres.ColumnString
-	Name postgres.ColumnString
+	ID        postgres.ColumnString
+	Name      postgres.ColumnString
+	CreatedAt postgres.ColumnTimestamp
+	UpdatedAt postgres.ColumnTimestamp
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -60,19 +62,23 @@ func newBuildingsTable(schemaName, tableName, alias string) *BuildingsTable {
 
 func newBuildingsTableImpl(schemaName, tableName, alias string) buildingsTable {
 	var (
-		IDColumn       = postgres.StringColumn("id")
-		NameColumn     = postgres.StringColumn("name")
-		allColumns     = postgres.ColumnList{IDColumn, NameColumn}
-		mutableColumns = postgres.ColumnList{NameColumn}
-		defaultColumns = postgres.ColumnList{}
+		IDColumn        = postgres.StringColumn("id")
+		NameColumn      = postgres.StringColumn("name")
+		CreatedAtColumn = postgres.TimestampColumn("created_at")
+		UpdatedAtColumn = postgres.TimestampColumn("updated_at")
+		allColumns      = postgres.ColumnList{IDColumn, NameColumn, CreatedAtColumn, UpdatedAtColumn}
+		mutableColumns  = postgres.ColumnList{NameColumn, CreatedAtColumn, UpdatedAtColumn}
+		defaultColumns  = postgres.ColumnList{CreatedAtColumn}
 	)
 
 	return buildingsTable{
 		Table: postgres.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		ID:   IDColumn,
-		Name: NameColumn,
+		ID:        IDColumn,
+		Name:      NameColumn,
+		CreatedAt: CreatedAtColumn,
+		UpdatedAt: UpdatedAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

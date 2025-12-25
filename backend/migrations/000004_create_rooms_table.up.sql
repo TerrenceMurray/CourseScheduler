@@ -3,8 +3,15 @@
 
 CREATE TABLE scheduler.buildings (
     id UUID PRIMARY KEY,
-    name VARCHAR(255) NOT NULL
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT NULL
 );
+
+CREATE TRIGGER update_buildings_timestamp
+BEFORE UPDATE ON scheduler.buildings
+FOR EACH ROW
+EXECUTE FUNCTION scheduler.update_timestamp();
 
 CREATE TABLE scheduler.rooms (
     id UUID PRIMARY KEY,
