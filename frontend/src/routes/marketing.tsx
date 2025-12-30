@@ -13,6 +13,8 @@ import {
   Code2,
   Layers,
   Menu,
+  Tag,
+  DoorOpen,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -54,6 +56,49 @@ function MarketingPage() {
     },
   ]
 
+  const steps = [
+    {
+      step: 1,
+      icon: Building2,
+      title: 'Add Buildings',
+      description: 'Register your campus buildings where classes will be held.',
+      color: 'text-blue-500',
+      bg: 'bg-blue-500',
+    },
+    {
+      step: 2,
+      icon: Tag,
+      title: 'Define Room Types',
+      description: 'Create categories like Lecture Hall, Lab, or Tutorial Room.',
+      color: 'text-violet-500',
+      bg: 'bg-violet-500',
+    },
+    {
+      step: 3,
+      icon: DoorOpen,
+      title: 'Add Rooms',
+      description: 'Add rooms with capacity and assign them to buildings.',
+      color: 'text-emerald-500',
+      bg: 'bg-emerald-500',
+    },
+    {
+      step: 4,
+      icon: BookOpen,
+      title: 'Create Courses',
+      description: 'Define courses with their session requirements.',
+      color: 'text-amber-500',
+      bg: 'bg-amber-500',
+    },
+    {
+      step: 5,
+      icon: Sparkles,
+      title: 'Generate Schedule',
+      description: 'Let the algorithm create a conflict-free timetable.',
+      color: 'text-rose-500',
+      bg: 'bg-rose-500',
+    },
+  ]
+
   const techStack = [
     { name: 'React 19', category: 'frontend' },
     { name: 'TanStack Router', category: 'frontend' },
@@ -82,6 +127,9 @@ function MarketingPage() {
             <nav className="hidden items-center gap-1 md:flex">
               <Button variant="ghost" size="sm" asChild>
                 <a href="#features">Features</a>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <a href="#how-it-works">How It Works</a>
               </Button>
               <Button variant="ghost" size="sm" asChild>
                 <a href="#tech">Tech Stack</a>
@@ -116,6 +164,9 @@ function MarketingPage() {
                   <div className="flex flex-col gap-4 pt-8">
                     <Button variant="ghost" className="justify-start" asChild>
                       <a href="#features">Features</a>
+                    </Button>
+                    <Button variant="ghost" className="justify-start" asChild>
+                      <a href="#how-it-works">How It Works</a>
                     </Button>
                     <Button variant="ghost" className="justify-start" asChild>
                       <a href="#tech">Tech Stack</a>
@@ -256,8 +307,75 @@ function MarketingPage() {
           </div>
         </section>
 
+        {/* How It Works */}
+        <section id="how-it-works" className="scroll-mt-16 border-b bg-muted/30 py-20 sm:py-28">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                How It Works
+              </h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                Get from zero to a complete schedule in five simple steps
+              </p>
+            </div>
+            <div className="mx-auto mt-16 max-w-4xl">
+              <div className="relative">
+                {/* Connecting line */}
+                <div className="absolute left-6 top-8 bottom-8 hidden w-0.5 bg-linear-to-b from-blue-500 via-emerald-500 to-rose-500 md:block" />
+
+                <div className="space-y-8">
+                  {steps.map((step, index) => (
+                    <div
+                      key={step.step}
+                      className="relative flex flex-col gap-4 md:flex-row md:gap-8"
+                    >
+                      {/* Step number circle */}
+                      <div className="flex shrink-0 items-start gap-4 md:w-12">
+                        <div className={`relative z-10 flex size-12 items-center justify-center rounded-full ${step.bg} text-white font-bold text-lg shadow-lg`}>
+                          {step.step}
+                        </div>
+                      </div>
+
+                      {/* Content card */}
+                      <Card className="flex-1 transition-all hover:shadow-md hover:border-primary/20">
+                        <CardContent className="flex items-start gap-4 p-5">
+                          <div className={`shrink-0 rounded-lg p-2.5 ${step.bg}/10`}>
+                            <step.icon className={`size-5 ${step.color}`} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-semibold">{step.title}</h3>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {step.description}
+                            </p>
+                          </div>
+                          {index < steps.length - 1 && (
+                            <ArrowRight className="hidden size-5 shrink-0 text-muted-foreground/50 lg:block" />
+                          )}
+                          {index === steps.length - 1 && (
+                            <CheckCircle2 className="hidden size-5 shrink-0 text-emerald-500 lg:block" />
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* CTA after steps */}
+              <div className="mt-12 text-center">
+                <Button size="lg" asChild>
+                  <Link to="/app">
+                    Start Setting Up
+                    <ArrowRight className="ml-2 size-4" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Stats */}
-        <section className="border-b bg-muted/30 py-16">
+        <section className="border-b py-16">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
               <div className="text-center">
