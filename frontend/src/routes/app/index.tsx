@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   BookOpen,
   DoorOpen,
@@ -14,7 +14,6 @@ import {
   X,
   Lightbulb,
   ChevronRight,
-  AlertCircle,
   Zap,
   Target,
 } from 'lucide-react'
@@ -23,6 +22,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CountUp } from '@/components/count-up'
 import { Progress } from '@/components/ui/progress'
+import { useCourses, useRooms, useBuildings, useSchedules } from '@/hooks'
 
 export const Route = createFileRoute('/app/')({
   component: Dashboard,
@@ -38,19 +38,21 @@ function getGreeting() {
 function Dashboard() {
   const [showTip, setShowTip] = useState(true)
 
-  const activityItems = [
-    { id: 1, action: 'Schedule generated', detail: 'Fall 2024 Schedule', time: '2h ago', icon: Sparkles, color: 'text-violet-500', bg: 'bg-violet-500/10' },
-    { id: 2, action: 'Course added', detail: 'CS401 Advanced Topics', time: '5h ago', icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { id: 3, action: 'Room updated', detail: 'Lab A capacity changed', time: '1d ago', icon: DoorOpen, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-    { id: 4, action: 'Building added', detail: 'Engineering West', time: '2d ago', icon: Building2, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-  ]
+  const { data: courses = [] } = useCourses()
+  const { data: rooms = [] } = useRooms()
+  const { data: buildings = [] } = useBuildings()
+  const { data: schedules = [] } = useSchedules()
+
+  // Get most recent schedule
+  const latestSchedule = schedules[0]
+  const scheduledSessionsCount = latestSchedule?.sessions?.length || 0
 
   const stats = [
     {
       title: 'Courses',
-      value: '24',
+      value: courses.length.toString(),
       icon: BookOpen,
-      change: '+2 this term',
+      change: `${courses.length} total`,
       trend: 'up',
       iconBg: 'bg-blue-500/10',
       iconColor: 'text-blue-500',
@@ -58,9 +60,9 @@ function Dashboard() {
     },
     {
       title: 'Rooms',
-      value: '18',
+      value: rooms.length.toString(),
       icon: DoorOpen,
-      change: '3 buildings',
+      change: `${buildings.length} buildings`,
       trend: 'neutral',
       iconBg: 'bg-violet-500/10',
       iconColor: 'text-violet-500',
@@ -68,19 +70,19 @@ function Dashboard() {
     },
     {
       title: 'Scheduled',
-      value: '142',
+      value: scheduledSessionsCount.toString(),
       icon: Calendar,
-      change: '98% placed',
+      change: latestSchedule ? latestSchedule.name : 'No schedules',
       trend: 'up',
       iconBg: 'bg-emerald-500/10',
       iconColor: 'text-emerald-500',
       href: '/app/schedule',
     },
     {
-      title: 'Health',
-      value: '98%',
+      title: 'Schedules',
+      value: schedules.length.toString(),
       icon: CheckCircle2,
-      change: 'No conflicts',
+      change: schedules.length > 0 ? 'View all' : 'Generate one',
       trend: 'up',
       iconBg: 'bg-emerald-500/10',
       iconColor: 'text-emerald-500',
@@ -88,34 +90,64 @@ function Dashboard() {
     },
   ]
 
-  const recentSchedules = [
-    { id: 1, name: 'Fall 2024 Schedule', sessions: 142, progress: 98, status: 'active' },
-    { id: 2, name: 'Summer 2024 Schedule', sessions: 48, progress: 100, status: 'archived' },
-    { id: 3, name: 'Spring 2024 Schedule', sessions: 138, progress: 100, status: 'archived' },
-  ]
+  // Transform schedules for display
+  const recentSchedules = useMemo(() => {
+    return schedules.slice(0, 3).map((schedule, index) => ({
+      id: schedule.id,
+      name: schedule.name,
+      sessions: schedule.sessions?.length || 0,
+      progress: 100,
+      status: index === 0 ? 'active' : 'archived',
+    }))
+  }, [schedules])
 
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
   const hours = ['8AM', '9AM', '10AM', '11AM', '12PM', '1PM', '2PM', '3PM', '4PM']
+  const colorPalette = ['bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500']
 
-  const previewSessions = [
-    { day: 'Mon', hour: '9AM', color: 'bg-blue-500', name: 'CS101' },
-    { day: 'Mon', hour: '2PM', color: 'bg-violet-500', name: 'CS201' },
-    { day: 'Tue', hour: '10AM', color: 'bg-emerald-500', name: 'MATH101' },
-    { day: 'Wed', hour: '9AM', color: 'bg-blue-500', name: 'CS101' },
-    { day: 'Wed', hour: '1PM', color: 'bg-amber-500', name: 'PHYS101' },
-    { day: 'Thu', hour: '11AM', color: 'bg-violet-500', name: 'CS201' },
-    { day: 'Fri', hour: '9AM', color: 'bg-emerald-500', name: 'MATH101' },
-    { day: 'Fri', hour: '3PM', color: 'bg-blue-500', name: 'CS301' },
-  ]
+  // Transform schedule sessions to preview format
+  const previewSessions = useMemo(() => {
+    if (!latestSchedule?.sessions) return []
+
+    const courseColorMap: Record<string, string> = {}
+    let colorIndex = 0
+
+    return latestSchedule.sessions.map((session) => {
+      if (!courseColorMap[session.course_id]) {
+        courseColorMap[session.course_id] = colorPalette[colorIndex % colorPalette.length]
+        colorIndex++
+      }
+
+      const startHour = Math.floor(session.start_time / 60)
+      const hourStr = startHour >= 12
+        ? `${startHour === 12 ? 12 : startHour - 12}PM`
+        : `${startHour}AM`
+
+      const course = courses.find(c => c.id === session.course_id)
+
+      return {
+        day: days[session.day] || 'Mon',
+        hour: hourStr,
+        color: courseColorMap[session.course_id],
+        name: course?.name || 'Unknown',
+      }
+    })
+  }, [latestSchedule, courses])
 
   const hasSession = (day: string, hour: string) => {
     return previewSessions.find(s => s.day === day && s.hour === hour)
   }
 
+  // Calculate total teaching hours from schedule
+  const totalTeachingHours = useMemo(() => {
+    if (!latestSchedule?.sessions) return 0
+    return latestSchedule.sessions.reduce((sum, s) => sum + (s.end_time - s.start_time) / 60, 0)
+  }, [latestSchedule])
+
   const insights = [
-    { icon: Target, label: 'Peak usage', value: 'Tue 10AM', color: 'text-blue-500' },
-    { icon: Zap, label: 'Utilization', value: '87%', color: 'text-emerald-500' },
-    { icon: Clock, label: 'Teaching hours', value: '213h', color: 'text-violet-500' },
+    { icon: Target, label: 'Sessions', value: scheduledSessionsCount.toString(), color: 'text-blue-500' },
+    { icon: Zap, label: 'Rooms used', value: rooms.length.toString(), color: 'text-emerald-500' },
+    { icon: Clock, label: 'Teaching hours', value: `${Math.round(totalTeachingHours)}h`, color: 'text-violet-500' },
   ]
 
   return (
@@ -309,24 +341,48 @@ function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Activity Feed */}
+          {/* Quick Stats */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Recent Activity</CardTitle>
+              <CardTitle className="text-base">Quick Stats</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {activityItems.map((item) => (
-                <div key={item.id} className="flex items-start gap-3">
-                  <div className={`rounded-lg p-1.5 ${item.bg}`}>
-                    <item.icon className={`size-3.5 ${item.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium leading-none mb-1">{item.action}</p>
-                    <p className="text-xs text-muted-foreground truncate">{item.detail}</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">{item.time}</span>
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg p-1.5 bg-blue-500/10">
+                  <BookOpen className="size-3.5 text-blue-500" />
                 </div>
-              ))}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium leading-none mb-1">Courses</p>
+                  <p className="text-xs text-muted-foreground truncate">{courses.length} total courses</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg p-1.5 bg-emerald-500/10">
+                  <DoorOpen className="size-3.5 text-emerald-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium leading-none mb-1">Rooms</p>
+                  <p className="text-xs text-muted-foreground truncate">{rooms.length} available rooms</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg p-1.5 bg-amber-500/10">
+                  <Building2 className="size-3.5 text-amber-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium leading-none mb-1">Buildings</p>
+                  <p className="text-xs text-muted-foreground truncate">{buildings.length} campus buildings</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg p-1.5 bg-violet-500/10">
+                  <Sparkles className="size-3.5 text-violet-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium leading-none mb-1">Schedules</p>
+                  <p className="text-xs text-muted-foreground truncate">{schedules.length} generated</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -341,7 +397,7 @@ function Dashboard() {
                 <Building2 className="size-6 text-blue-500" />
               </div>
               <div className="flex-1">
-                <p className="text-3xl font-bold"><CountUp value="3" /></p>
+                <p className="text-3xl font-bold"><CountUp value={buildings.length.toString()} /></p>
                 <p className="text-sm text-muted-foreground">Buildings</p>
               </div>
               <ChevronRight className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -355,7 +411,7 @@ function Dashboard() {
                 <Clock className="size-6 text-violet-500" />
               </div>
               <div className="flex-1">
-                <p className="text-3xl font-bold"><CountUp value="213" suffix="h" /></p>
+                <p className="text-3xl font-bold"><CountUp value={Math.round(totalTeachingHours).toString()} suffix="h" /></p>
                 <p className="text-sm text-muted-foreground">Teaching Hours</p>
               </div>
               <ChevronRight className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -369,8 +425,8 @@ function Dashboard() {
                 <TrendingUp className="size-6 text-emerald-500" />
               </div>
               <div className="flex-1">
-                <p className="text-3xl font-bold"><CountUp value="87" suffix="%" /></p>
-                <p className="text-sm text-muted-foreground">Room Utilization</p>
+                <p className="text-3xl font-bold"><CountUp value={rooms.reduce((sum, r) => sum + r.capacity, 0).toString()} /></p>
+                <p className="text-sm text-muted-foreground">Total Capacity</p>
               </div>
               <ChevronRight className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
             </CardContent>

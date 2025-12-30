@@ -19,13 +19,14 @@ import {
 } from '@/components/ui/select'
 import { NumberInput } from '@/components/ui/number-input'
 import { Badge } from '@/components/ui/badge'
-import { Building2, DoorOpen, FlaskConical, Presentation, Users } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Building2, DoorOpen, Users } from 'lucide-react'
 
 interface CreateRoomModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit?: (room: RoomFormData) => void
+  buildings?: string[]
+  roomTypes?: string[]
 }
 
 interface RoomFormData {
@@ -35,36 +36,27 @@ interface RoomFormData {
   capacity: number
 }
 
-const buildings = [
-  { id: '1', name: 'Science Building', code: 'SCI' },
-  { id: '2', name: 'Engineering Building', code: 'ENG' },
-  { id: '3', name: 'Arts Building', code: 'ART' },
-  { id: '4', name: 'Library', code: 'LIB' },
-  { id: '5', name: 'Student Center', code: 'STU' },
-]
-
-const roomTypes = [
-  { value: 'Lecture Hall', icon: Presentation, color: 'blue', description: 'Large tiered seating' },
-  { value: 'Classroom', icon: DoorOpen, color: 'violet', description: 'Standard classroom' },
-  { value: 'Lab', icon: FlaskConical, color: 'emerald', description: 'Practical sessions' },
-]
-
-export function CreateRoomModal({ open, onOpenChange, onSubmit }: CreateRoomModalProps) {
+export function CreateRoomModal({
+  open,
+  onOpenChange,
+  onSubmit,
+  buildings = [],
+  roomTypes = [],
+}: CreateRoomModalProps) {
   const [formData, setFormData] = useState<RoomFormData>({
     name: '',
     building: '',
-    type: 'Classroom',
+    type: '',
     capacity: 40,
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onSubmit?.(formData)
-    onOpenChange(false)
     setFormData({
       name: '',
       building: '',
-      type: 'Classroom',
+      type: '',
       capacity: 40,
     })
   }
@@ -85,52 +77,13 @@ export function CreateRoomModal({ open, onOpenChange, onSubmit }: CreateRoomModa
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 pt-4">
-          {/* Room Type Selection */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Room Type</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {roomTypes.map((type) => {
-                const Icon = type.icon
-                const isSelected = formData.type === type.value
-                const colorClasses = {
-                  blue: { bg: 'bg-blue-500/10', text: 'text-blue-500', border: 'border-blue-500' },
-                  violet: { bg: 'bg-violet-500/10', text: 'text-violet-500', border: 'border-violet-500' },
-                  emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-500', border: 'border-emerald-500' },
-                }[type.color] || { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-muted' }
-
-                return (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, type: type.value })}
-                    className={cn(
-                      'flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 transition-all hover:border-primary/50',
-                      isSelected
-                        ? `${colorClasses.border} ${colorClasses.bg}`
-                        : 'border-muted bg-transparent'
-                    )}
-                  >
-                    <Icon className={cn(
-                      'size-5',
-                      isSelected ? colorClasses.text : 'text-muted-foreground'
-                    )} />
-                    <span className={cn(
-                      'text-xs font-medium',
-                      isSelected ? colorClasses.text : 'text-foreground'
-                    )}>{type.value}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
           {/* Room Details */}
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name" className="text-sm">Room Name / Number</Label>
               <Input
                 id="name"
-                placeholder="Room 101 or Lab A"
+                placeholder="e.g., Room 101 or Lab A"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
@@ -148,12 +101,30 @@ export function CreateRoomModal({ open, onOpenChange, onSubmit }: CreateRoomModa
                 </SelectTrigger>
                 <SelectContent>
                   {buildings.map((building) => (
-                    <SelectItem key={building.id} value={building.name}>
+                    <SelectItem key={building} value={building}>
                       <div className="flex items-center gap-2">
                         <Building2 className="size-4 text-muted-foreground" />
-                        <span>{building.name}</span>
-                        <span className="text-xs text-muted-foreground font-mono">({building.code})</span>
+                        <span>{building}</span>
                       </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="type" className="text-sm">Room Type</Label>
+              <Select
+                value={formData.type}
+                onValueChange={(value) => setFormData({ ...formData, type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a room type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roomTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -177,18 +148,15 @@ export function CreateRoomModal({ open, onOpenChange, onSubmit }: CreateRoomModa
           </div>
 
           {/* Summary */}
-          {formData.name && formData.building && (
+          {formData.name && formData.building && formData.type && (
             <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-violet-500/10 p-2">
-                  {(() => {
-                    const Icon = roomTypes.find(t => t.value === formData.type)?.icon || DoorOpen
-                    return <Icon className="size-4 text-violet-500" />
-                  })()}
+                  <DoorOpen className="size-4 text-violet-500" />
                 </div>
                 <div>
                   <p className="font-medium text-sm">{formData.name}</p>
-                  <p className="text-xs text-muted-foreground">{formData.building}</p>
+                  <p className="text-xs text-muted-foreground">{formData.building} - {formData.type}</p>
                 </div>
               </div>
               <Badge variant="secondary" className="text-xs">
@@ -202,7 +170,9 @@ export function CreateRoomModal({ open, onOpenChange, onSubmit }: CreateRoomModa
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">Add Room</Button>
+            <Button type="submit" disabled={!formData.name || !formData.building || !formData.type}>
+              Add Room
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

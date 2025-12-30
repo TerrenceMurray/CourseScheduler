@@ -6,7 +6,6 @@ import {
   MoreHorizontal,
   BookOpen,
   Clock,
-  Users,
   FlaskConical,
   GraduationCap,
   Filter,
@@ -41,12 +40,18 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { CountUp } from '@/components/count-up'
 import { CreateCourseModal } from '@/components/modals'
+import { useCourses, useCreateCourse, useDeleteCourse } from '@/hooks'
+import { useSessions, useCreateSession } from '@/hooks'
+import { useRoomTypes } from '@/hooks'
+import { TableSkeleton } from '@/components/loading-skeleton'
+import { ErrorState } from '@/components/error-state'
+import type { SessionType } from '@/types/api'
 
 export const Route = createFileRoute('/app/courses')({
   component: CoursesPage,
 })
 
-type SortField = 'name' | 'code' | 'enrolled' | 'sessions' | 'totalHours'
+type SortField = 'name' | 'sessions' | 'totalHours'
 type SortDirection = 'asc' | 'desc'
 
 function CoursesPage() {
@@ -57,46 +62,54 @@ function CoursesPage() {
   const [typeFilter, setTypeFilter] = useState<string[]>([])
   const [createModalOpen, setCreateModalOpen] = useState(false)
 
-  const allCourses = [
-    { id: '1', code: 'CS101', name: 'Introduction to Computer Science', sessions: 3, totalHours: 4.5, type: 'Lecture', enrolled: 120 },
-    { id: '2', code: 'CS201', name: 'Data Structures', sessions: 2, totalHours: 3, type: 'Lecture', enrolled: 85 },
-    { id: '3', code: 'CS301', name: 'Algorithms', sessions: 2, totalHours: 3, type: 'Lecture', enrolled: 72 },
-    { id: '4', code: 'CS102', name: 'Programming Lab', sessions: 1, totalHours: 2, type: 'Lab', enrolled: 60 },
-    { id: '5', code: 'MATH101', name: 'Calculus I', sessions: 3, totalHours: 4.5, type: 'Lecture', enrolled: 150 },
-    { id: '6', code: 'MATH201', name: 'Linear Algebra', sessions: 2, totalHours: 3, type: 'Lecture', enrolled: 95 },
-    { id: '7', code: 'PHYS101', name: 'Physics I', sessions: 2, totalHours: 3, type: 'Lecture', enrolled: 110 },
-    { id: '8', code: 'PHYS102', name: 'Physics Lab', sessions: 1, totalHours: 3, type: 'Lab', enrolled: 55 },
-  ]
+  const { data: allCourses = [], isLoading, isError, refetch } = useCourses()
+  const { data: allSessions = [] } = useSessions()
+  const { data: roomTypes = [] } = useRoomTypes()
+  const createCourse = useCreateCourse()
+  const createSession = useCreateSession()
+  const deleteCourse = useDeleteCourse()
+
+  // Get room type names for the modal
+  const roomTypeNames = roomTypes.map(rt => rt.name)
+
+  // Build enriched courses with session data
+  const enrichedCourses = useMemo(() => {
+    return allCourses.map(course => {
+      const courseSessions = allSessions.filter(s => s.course_id === course.id)
+      const totalSessions = courseSessions.reduce((sum, s) => sum + s.number_of_sessions, 0)
+      const totalMinutes = courseSessions.reduce((sum, s) => sum + (s.duration * s.number_of_sessions), 0)
+      const types = [...new Set(courseSessions.map(s => s.type))]
+      const primaryType = types.includes('lab') ? 'lab' : types.includes('lecture') ? 'lecture' : 'tutorial'
+
+      return {
+        id: course.id,
+        name: course.name,
+        sessions: totalSessions,
+        totalHours: Math.round(totalMinutes / 60 * 10) / 10,
+        type: primaryType,
+        sessionDetails: courseSessions,
+      }
+    })
+  }, [allCourses, allSessions])
 
   // Filter and sort courses
   const courses = useMemo(() => {
-    let filtered = allCourses
+    let filtered = enrichedCourses
 
-    // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(
-        c => c.name.toLowerCase().includes(query) || c.code.toLowerCase().includes(query)
-      )
+      filtered = filtered.filter(c => c.name.toLowerCase().includes(query))
     }
 
-    // Apply type filter
     if (typeFilter.length > 0) {
       filtered = filtered.filter(c => typeFilter.includes(c.type))
     }
 
-    // Apply sorting
     filtered.sort((a, b) => {
       let comparison = 0
       switch (sortField) {
         case 'name':
           comparison = a.name.localeCompare(b.name)
-          break
-        case 'code':
-          comparison = a.code.localeCompare(b.code)
-          break
-        case 'enrolled':
-          comparison = a.enrolled - b.enrolled
           break
         case 'sessions':
           comparison = a.sessions - b.sessions
@@ -109,7 +122,7 @@ function CoursesPage() {
     })
 
     return filtered
-  }, [searchQuery, typeFilter, sortField, sortDirection])
+  }, [enrichedCourses, searchQuery, typeFilter, sortField, sortDirection])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -147,9 +160,36 @@ function CoursesPage() {
   const clearSelection = () => setSelectedIds(new Set())
 
   const handleBulkDelete = () => {
-    // In a real app, this would delete selected courses
-    console.log('Deleting:', Array.from(selectedIds))
+    selectedIds.forEach(id => deleteCourse.mutate(id))
     clearSelection()
+  }
+
+  const handleCreate = async (data: {
+    name: string
+    type: string
+    sessions: number
+    sessionDuration: number
+    requiredRoom: string
+  }) => {
+    createCourse.mutate(
+      { name: data.name },
+      {
+        onSuccess: (course) => {
+          createSession.mutate({
+            course_id: course.id,
+            required_room: data.requiredRoom,
+            type: data.type.toLowerCase() as SessionType,
+            duration: Math.round(data.sessionDuration * 60),
+            number_of_sessions: data.sessions,
+          })
+          setCreateModalOpen(false)
+        },
+      }
+    )
+  }
+
+  const handleDeleteCourse = (id: string) => {
+    deleteCourse.mutate(id)
   }
 
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -184,7 +224,7 @@ function CoursesPage() {
     },
     {
       title: 'Lab Courses',
-      value: courses.filter(c => c.type === 'Lab').length.toString(),
+      value: courses.filter(c => c.type === 'lab').length.toString(),
       icon: FlaskConical,
       description: 'Hands-on sessions',
       iconBg: 'bg-amber-500/10',
@@ -194,13 +234,48 @@ function CoursesPage() {
 
   const getTypeStyles = (type: string) => {
     switch (type) {
-      case 'Lab':
+      case 'lab':
         return { bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20' }
-      case 'Lecture':
+      case 'lecture':
         return { bg: 'bg-blue-500/10', text: 'text-blue-500', border: 'border-blue-500/20' }
+      case 'tutorial':
+        return { bg: 'bg-emerald-500/10', text: 'text-emerald-500', border: 'border-emerald-500/20' }
       default:
         return { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-muted' }
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 flex-col gap-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Courses</h1>
+            <p className="text-muted-foreground">Manage your courses, sessions, and curriculum</p>
+          </div>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>All Courses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TableSkeleton rows={5} />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-1 flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Courses</h1>
+          <p className="text-muted-foreground">Manage your courses, sessions, and curriculum</p>
+        </div>
+        <ErrorState message="Failed to load courses" onRetry={() => refetch()} />
+      </div>
+    )
   }
 
   return (
@@ -222,7 +297,8 @@ function CoursesPage() {
       <CreateCourseModal
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
-        onSubmit={(data) => console.log('New course:', data)}
+        onSubmit={handleCreate}
+        roomTypes={roomTypeNames}
       />
 
       {/* Stats Grid */}
@@ -281,18 +357,25 @@ function CoursesPage() {
                   <DropdownMenuLabel>Filter by Type</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuCheckboxItem
-                    checked={typeFilter.includes('Lecture')}
-                    onCheckedChange={() => toggleTypeFilter('Lecture')}
+                    checked={typeFilter.includes('lecture')}
+                    onCheckedChange={() => toggleTypeFilter('lecture')}
                   >
                     <BookOpen className="mr-2 size-4" />
                     Lecture
                   </DropdownMenuCheckboxItem>
                   <DropdownMenuCheckboxItem
-                    checked={typeFilter.includes('Lab')}
-                    onCheckedChange={() => toggleTypeFilter('Lab')}
+                    checked={typeFilter.includes('lab')}
+                    onCheckedChange={() => toggleTypeFilter('lab')}
                   >
                     <FlaskConical className="mr-2 size-4" />
                     Lab
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={typeFilter.includes('tutorial')}
+                    onCheckedChange={() => toggleTypeFilter('tutorial')}
+                  >
+                    <GraduationCap className="mr-2 size-4" />
+                    Tutorial
                   </DropdownMenuCheckboxItem>
                   {typeFilter.length > 0 && (
                     <>
@@ -351,16 +434,6 @@ function CoursesPage() {
                 <TableHead>Type</TableHead>
                 <TableHead className="text-center">
                   <button
-                    onClick={() => handleSort('enrolled')}
-                    className="flex items-center justify-center gap-1 w-full hover:text-foreground transition-colors"
-                  >
-                    <Users className="size-3" />
-                    <span>Enrolled</span>
-                    <SortIcon field="enrolled" />
-                  </button>
-                </TableHead>
-                <TableHead className="text-center">
-                  <button
                     onClick={() => handleSort('sessions')}
                     className="flex items-center justify-center w-full hover:text-foreground transition-colors"
                   >
@@ -383,7 +456,7 @@ function CoursesPage() {
             <TableBody>
               {courses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     {searchQuery || typeFilter.length > 0 ? (
                       <div className="space-y-2">
                         <p>No courses match your filters</p>
@@ -392,7 +465,12 @@ function CoursesPage() {
                         </Button>
                       </div>
                     ) : (
-                      <p>No courses found</p>
+                      <div className="space-y-2">
+                        <p>No courses found</p>
+                        <Button variant="link" onClick={() => setCreateModalOpen(true)}>
+                          Add your first course
+                        </Button>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>
@@ -409,25 +487,23 @@ function CoursesPage() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className={`flex size-10 items-center justify-center rounded-lg ${typeStyles.bg}`}>
-                          {course.type === 'Lab' ? (
+                          {course.type === 'lab' ? (
                             <FlaskConical className={`size-5 ${typeStyles.text}`} />
+                          ) : course.type === 'tutorial' ? (
+                            <GraduationCap className={`size-5 ${typeStyles.text}`} />
                           ) : (
                             <BookOpen className={`size-5 ${typeStyles.text}`} />
                           )}
                         </div>
                         <div>
                           <div className="font-medium">{course.name}</div>
-                          <div className="text-sm text-muted-foreground font-mono">{course.code}</div>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`${typeStyles.bg} ${typeStyles.text} ${typeStyles.border}`}>
+                      <Badge variant="outline" className={`${typeStyles.bg} ${typeStyles.text} ${typeStyles.border} capitalize`}>
                         {course.type}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="font-medium">{course.enrolled}</span>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
@@ -455,9 +531,13 @@ function CoursesPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem>Edit Course</DropdownMenuItem>
                           <DropdownMenuItem>View Sessions</DropdownMenuItem>
-                          <DropdownMenuItem>Duplicate</DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDeleteCourse(course.id)}
+                          >
+                            Delete
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   Plus,
   Users,
@@ -13,8 +13,6 @@ import {
   List,
   Pencil,
   Trash2,
-  Calendar,
-  CheckCircle2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,6 +42,11 @@ import {
 } from '@/components/ui/table'
 import { CountUp } from '@/components/count-up'
 import { CreateRoomModal } from '@/components/modals'
+import { useRooms, useCreateRoom, useDeleteRoom } from '@/hooks'
+import { useBuildings } from '@/hooks'
+import { useRoomTypes } from '@/hooks'
+import { CardListSkeleton } from '@/components/loading-skeleton'
+import { ErrorState } from '@/components/error-state'
 
 export const Route = createFileRoute('/app/rooms')({
   component: RoomsPage,
@@ -52,22 +55,72 @@ export const Route = createFileRoute('/app/rooms')({
 function RoomsPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [buildingFilter, setBuildingFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
 
-  const rooms = [
-    { id: '1', name: 'Room 101', building: 'Science Building', type: 'Lecture Hall', capacity: 120, utilization: 85, available: true },
-    { id: '2', name: 'Room 102', building: 'Science Building', type: 'Classroom', capacity: 40, utilization: 72, available: true },
-    { id: '3', name: 'Lab A', building: 'Science Building', type: 'Lab', capacity: 30, utilization: 90, available: false },
-    { id: '4', name: 'Room 201', building: 'Engineering Building', type: 'Lecture Hall', capacity: 100, utilization: 78, available: true },
-    { id: '5', name: 'Room 202', building: 'Engineering Building', type: 'Classroom', capacity: 35, utilization: 65, available: true },
-    { id: '6', name: 'Lab B', building: 'Engineering Building', type: 'Lab', capacity: 25, utilization: 88, available: false },
-    { id: '7', name: 'Room 301', building: 'Arts Building', type: 'Classroom', capacity: 45, utilization: 55, available: true },
-    { id: '8', name: 'Auditorium', building: 'Arts Building', type: 'Lecture Hall', capacity: 200, utilization: 45, available: true },
-  ]
+  const { data: rooms = [], isLoading, isError, refetch } = useRooms()
+  const { data: buildings = [] } = useBuildings()
+  const { data: roomTypes = [] } = useRoomTypes()
+  const createRoom = useCreateRoom()
+  const deleteRoom = useDeleteRoom()
+
+  // Create lookup maps
+  const buildingMap = useMemo(() => {
+    return new Map(buildings.map(b => [b.id, b.name]))
+  }, [buildings])
+
+  // Filter rooms
+  const filteredRooms = useMemo(() => {
+    let result = rooms
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      result = result.filter(r =>
+        r.name.toLowerCase().includes(query) ||
+        buildingMap.get(r.building_id)?.toLowerCase().includes(query)
+      )
+    }
+
+    if (buildingFilter !== 'all') {
+      result = result.filter(r => r.building_id === buildingFilter)
+    }
+
+    if (typeFilter !== 'all') {
+      result = result.filter(r => r.type === typeFilter)
+    }
+
+    return result
+  }, [rooms, searchQuery, buildingFilter, typeFilter, buildingMap])
+
+  const handleCreate = (data: {
+    name: string
+    building: string
+    type: string
+    capacity: number
+  }) => {
+    // Find building ID by name
+    const building = buildings.find(b => b.name === data.building)
+    if (!building) return
+
+    createRoom.mutate({
+      name: data.name,
+      building_id: building.id,
+      type: data.type,
+      capacity: data.capacity,
+    }, {
+      onSuccess: () => setCreateModalOpen(false),
+    })
+  }
+
+  const handleDelete = (id: string) => {
+    deleteRoom.mutate(id)
+  }
 
   const stats = [
     {
       title: 'Total Rooms',
-      value: rooms.length.toString(),
+      value: filteredRooms.length.toString(),
       icon: DoorOpen,
       description: 'Across all buildings',
       iconBg: 'bg-blue-500/10',
@@ -75,25 +128,25 @@ function RoomsPage() {
     },
     {
       title: 'Total Capacity',
-      value: rooms.reduce((sum, r) => sum + r.capacity, 0).toString(),
+      value: filteredRooms.reduce((sum, r) => sum + r.capacity, 0).toString(),
       icon: Users,
       description: 'Combined seating',
       iconBg: 'bg-violet-500/10',
       iconColor: 'text-violet-500',
     },
     {
-      title: 'Available Now',
-      value: rooms.filter(r => r.available).length.toString(),
-      icon: CheckCircle2,
-      description: 'Ready for scheduling',
+      title: 'Buildings',
+      value: buildings.length.toString(),
+      icon: Building2,
+      description: 'With rooms',
       iconBg: 'bg-emerald-500/10',
       iconColor: 'text-emerald-500',
     },
     {
-      title: 'Avg. Utilization',
-      value: Math.round(rooms.reduce((sum, r) => sum + r.utilization, 0) / rooms.length) + '%',
-      icon: Calendar,
-      description: 'This semester',
+      title: 'Room Types',
+      value: roomTypes.length.toString(),
+      icon: Presentation,
+      description: 'Categories',
       iconBg: 'bg-amber-500/10',
       iconColor: 'text-amber-500',
     },
@@ -101,32 +154,51 @@ function RoomsPage() {
 
   const getTypeConfig = (type: string) => {
     const configs: Record<string, { icon: typeof DoorOpen; bg: string; text: string; border: string }> = {
-      'Lecture Hall': {
+      'lecture_room': {
         icon: Presentation,
         bg: 'bg-blue-500/10',
         text: 'text-blue-500',
         border: 'border-blue-500/20',
       },
-      'Classroom': {
-        icon: DoorOpen,
-        bg: 'bg-violet-500/10',
-        text: 'text-violet-500',
-        border: 'border-violet-500/20',
-      },
-      'Lab': {
+      'computer_lab': {
         icon: FlaskConical,
         bg: 'bg-emerald-500/10',
         text: 'text-emerald-500',
         border: 'border-emerald-500/20',
       },
     }
-    return configs[type] || configs['Classroom']
+    return configs[type] || {
+      icon: DoorOpen,
+      bg: 'bg-violet-500/10',
+      text: 'text-violet-500',
+      border: 'border-violet-500/20',
+    }
   }
 
-  const getUtilizationColor = (utilization: number) => {
-    if (utilization >= 80) return 'bg-emerald-500'
-    if (utilization >= 60) return 'bg-amber-500'
-    return 'bg-rose-500'
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 flex-col gap-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Rooms</h1>
+            <p className="text-muted-foreground">Manage available rooms and their capacities</p>
+          </div>
+        </div>
+        <CardListSkeleton cards={8} />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-1 flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Rooms</h1>
+          <p className="text-muted-foreground">Manage available rooms and their capacities</p>
+        </div>
+        <ErrorState message="Failed to load rooms" onRetry={() => refetch()} />
+      </div>
+    )
   }
 
   return (
@@ -148,7 +220,9 @@ function RoomsPage() {
       <CreateRoomModal
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
-        onSubmit={(data) => console.log('New room:', data)}
+        onSubmit={handleCreate}
+        buildings={buildings.map(b => b.name)}
+        roomTypes={roomTypes.map(rt => rt.name)}
       />
 
       {/* Stats Grid */}
@@ -180,29 +254,34 @@ function RoomsPage() {
             <div className="flex items-center gap-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Search rooms..." className="pl-9 w-48" />
+                <Input
+                  placeholder="Search rooms..."
+                  className="pl-9 w-48"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
               </div>
-              <Select defaultValue="all">
+              <Select value={buildingFilter} onValueChange={setBuildingFilter}>
                 <SelectTrigger className="w-44">
                   <Building2 className="mr-2 size-4" />
                   <SelectValue placeholder="Building" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Buildings</SelectItem>
-                  <SelectItem value="science">Science Building</SelectItem>
-                  <SelectItem value="engineering">Engineering Building</SelectItem>
-                  <SelectItem value="arts">Arts Building</SelectItem>
+                  {buildings.map(b => (
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              <Select defaultValue="all">
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
                 <SelectTrigger className="w-44">
                   <SelectValue placeholder="Type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="lecture">Lecture Hall</SelectItem>
-                  <SelectItem value="classroom">Classroom</SelectItem>
-                  <SelectItem value="lab">Lab</SelectItem>
+                  {roomTypes.map(rt => (
+                    <SelectItem key={rt.name} value={rt.name}>{rt.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <div className="flex border rounded-md">
@@ -227,11 +306,34 @@ function RoomsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {viewMode === 'grid' ? (
+          {filteredRooms.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              {searchQuery || buildingFilter !== 'all' || typeFilter !== 'all' ? (
+                <div className="space-y-2">
+                  <p>No rooms match your filters</p>
+                  <Button variant="link" onClick={() => {
+                    setSearchQuery('')
+                    setBuildingFilter('all')
+                    setTypeFilter('all')
+                  }}>
+                    Clear all filters
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p>No rooms found</p>
+                  <Button variant="link" onClick={() => setCreateModalOpen(true)}>
+                    Add your first room
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : viewMode === 'grid' ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {rooms.map((room) => {
+              {filteredRooms.map((room) => {
                 const typeConfig = getTypeConfig(room.type)
                 const TypeIcon = typeConfig.icon
+                const buildingName = buildingMap.get(room.building_id) || 'Unknown'
                 return (
                   <Card
                     key={room.id}
@@ -242,71 +344,46 @@ function RoomsPage() {
                         <div className={`rounded-lg p-2.5 ${typeConfig.bg}`}>
                           <TypeIcon className={`size-5 ${typeConfig.text}`} />
                         </div>
-                        <div className="flex items-center gap-2">
-                          {room.available ? (
-                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
-                              Available
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-rose-500/10 text-rose-500 border-rose-500/20">
-                              In Use
-                            </Badge>
-                          )}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="size-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <MoreHorizontal className="size-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
-                                <Pencil className="mr-2 size-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Calendar className="mr-2 size-4" />
-                                View Schedule
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive">
-                                <Trash2 className="mr-2 size-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Pencil className="mr-2 size-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDelete(room.id)}
+                            >
+                              <Trash2 className="mr-2 size-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                       <CardTitle className="text-base">{room.name}</CardTitle>
                       <CardDescription className="flex items-center gap-1">
                         <Building2 className="size-3" />
-                        {room.building}
+                        {buildingName}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-0">
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center justify-between">
                         <Badge variant="outline" className={`${typeConfig.bg} ${typeConfig.text} ${typeConfig.border}`}>
                           {room.type}
                         </Badge>
                         <div className="flex items-center gap-1 text-sm">
                           <Users className="size-3.5 text-muted-foreground" />
                           <span className="font-medium">{room.capacity}</span>
-                        </div>
-                      </div>
-                      {/* Utilization Bar */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Utilization</span>
-                          <span className="font-medium">{room.utilization}%</span>
-                        </div>
-                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${getUtilizationColor(room.utilization)}`}
-                            style={{ width: `${room.utilization}%` }}
-                          />
                         </div>
                       </div>
                     </CardContent>
@@ -322,15 +399,14 @@ function RoomsPage() {
                   <TableHead>Building</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead className="text-center">Capacity</TableHead>
-                  <TableHead>Utilization</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rooms.map((room) => {
+                {filteredRooms.map((room) => {
                   const typeConfig = getTypeConfig(room.type)
                   const TypeIcon = typeConfig.icon
+                  const buildingName = buildingMap.get(room.building_id) || 'Unknown'
                   return (
                     <TableRow key={room.id} className="group">
                       <TableCell>
@@ -344,7 +420,7 @@ function RoomsPage() {
                       <TableCell>
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Building2 className="size-3" />
-                          {room.building}
+                          {buildingName}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -359,28 +435,6 @@ function RoomsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2 min-w-[100px]">
-                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${getUtilizationColor(room.utilization)}`}
-                              style={{ width: `${room.utilization}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-medium w-8">{room.utilization}%</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {room.available ? (
-                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
-                            Available
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-rose-500/10 text-rose-500 border-rose-500/20">
-                            In Use
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="size-8">
@@ -392,12 +446,11 @@ function RoomsPage() {
                               <Pencil className="mr-2 size-4" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Calendar className="mr-2 size-4" />
-                              View Schedule
-                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDelete(room.id)}
+                            >
                               <Trash2 className="mr-2 size-4" />
                               Delete
                             </DropdownMenuItem>

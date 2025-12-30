@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   Calendar,
   Clock,
@@ -13,8 +13,6 @@ import {
   CheckCircle2,
   Printer,
   FileDown,
-  AlertTriangle,
-  X,
   MapPin,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -43,48 +41,109 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { CountUp } from '@/components/count-up'
+import { useSchedules, useCourses, useRooms, useBuildings } from '@/hooks'
+import { CardListSkeleton } from '@/components/loading-skeleton'
+import { ErrorState } from '@/components/error-state'
 
 export const Route = createFileRoute('/app/schedule')({
   component: SchedulePage,
 })
 
 type Session = {
-  id: number
+  id: string
   course: string
-  name: string
+  courseName: string
   room: string
   building: string
   day: string
   startHour: number
   duration: number
   color: string
-  enrolled: number
   capacity: number
-  instructor: string
 }
 
 function SchedulePage() {
   const [selectedSession, setSelectedSession] = useState<Session | null>(null)
-  const [showConflictWarning, setShowConflictWarning] = useState(true)
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string>('')
+
+  const { data: schedules = [], isLoading: schedulesLoading, isError: schedulesError, refetch: refetchSchedules } = useSchedules()
+  const { data: courses = [] } = useCourses()
+  const { data: rooms = [] } = useRooms()
+  const { data: buildings = [] } = useBuildings()
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
   const hours = Array.from({ length: 12 }, (_, i) => i + 8) // 8AM to 7PM
 
-  const sessions: Session[] = [
-    { id: 1, course: 'CS101', name: 'Intro to CS', room: 'Room 101', building: 'Science Building', day: 'Monday', startHour: 9, duration: 1.5, color: 'blue', enrolled: 120, capacity: 150, instructor: 'Dr. Smith' },
-    { id: 2, course: 'MATH101', name: 'Calculus I', room: 'Room 201', building: 'Math Building', day: 'Monday', startHour: 11, duration: 1.5, color: 'emerald', enrolled: 150, capacity: 150, instructor: 'Prof. Johnson' },
-    { id: 3, course: 'CS201', name: 'Data Structures', room: 'Lab A', building: 'Science Building', day: 'Tuesday', startHour: 10, duration: 2, color: 'violet', enrolled: 85, capacity: 100, instructor: 'Dr. Williams' },
-    { id: 4, course: 'PHYS101', name: 'Physics I', room: 'Room 101', building: 'Science Building', day: 'Wednesday', startHour: 9, duration: 1.5, color: 'amber', enrolled: 110, capacity: 150, instructor: 'Prof. Brown' },
-    { id: 5, course: 'CS101', name: 'Intro to CS', room: 'Room 101', building: 'Science Building', day: 'Wednesday', startHour: 14, duration: 1.5, color: 'blue', enrolled: 120, capacity: 150, instructor: 'Dr. Smith' },
-    { id: 6, course: 'MATH201', name: 'Linear Algebra', room: 'Room 202', building: 'Math Building', day: 'Thursday', startHour: 11, duration: 1.5, color: 'rose', enrolled: 95, capacity: 100, instructor: 'Prof. Davis' },
-    { id: 7, course: 'CS301', name: 'Algorithms', room: 'Room 101', building: 'Science Building', day: 'Friday', startHour: 9, duration: 1.5, color: 'cyan', enrolled: 72, capacity: 80, instructor: 'Dr. Miller' },
-    { id: 8, course: 'CS201', name: 'Data Structures', room: 'Lab A', building: 'Science Building', day: 'Friday', startHour: 14, duration: 2, color: 'violet', enrolled: 85, capacity: 100, instructor: 'Dr. Williams' },
-  ]
+  // Color palette for courses
+  const colorPalette = ['blue', 'emerald', 'violet', 'amber', 'rose', 'cyan']
 
-  // Simulated conflict for demo
-  const conflicts = [
-    { type: 'capacity', message: 'MATH101 is at full capacity (150/150 students)' },
-  ]
+  // Create lookup maps
+  const courseMap = useMemo(() => {
+    return courses.reduce((acc, course) => {
+      acc[course.id] = course
+      return acc
+    }, {} as Record<string, typeof courses[0]>)
+  }, [courses])
+
+  const roomMap = useMemo(() => {
+    return rooms.reduce((acc, room) => {
+      acc[room.id] = room
+      return acc
+    }, {} as Record<string, typeof rooms[0]>)
+  }, [rooms])
+
+  const buildingMap = useMemo(() => {
+    return buildings.reduce((acc, building) => {
+      acc[building.id] = building
+      return acc
+    }, {} as Record<string, typeof buildings[0]>)
+  }, [buildings])
+
+  // Get current schedule
+  const currentSchedule = useMemo(() => {
+    if (selectedScheduleId) {
+      return schedules.find(s => s.id === selectedScheduleId)
+    }
+    return schedules[0]
+  }, [schedules, selectedScheduleId])
+
+  // Transform scheduled sessions to UI format
+  const sessions: Session[] = useMemo(() => {
+    if (!currentSchedule?.sessions) return []
+
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    const courseColorMap: Record<string, string> = {}
+    let colorIndex = 0
+
+    return currentSchedule.sessions.map((session, index) => {
+      const course = courseMap[session.course_id]
+      const room = roomMap[session.room_id]
+      const building = room ? buildingMap[room.building_id] : undefined
+
+      // Assign consistent color per course
+      if (session.course_id && !courseColorMap[session.course_id]) {
+        courseColorMap[session.course_id] = colorPalette[colorIndex % colorPalette.length]
+        colorIndex++
+      }
+
+      // Convert minutes from midnight to hours
+      const startHour = session.start_time / 60
+      const duration = (session.end_time - session.start_time) / 60
+
+      return {
+        id: `${session.course_id}-${session.room_id}-${session.day}-${index}`,
+        course: course?.name || 'Unknown Course',
+        courseName: course?.name || 'Unknown Course',
+        room: room?.name || 'Unknown Room',
+        building: building?.name || 'Unknown Building',
+        day: dayNames[session.day] || 'Unknown',
+        startHour,
+        duration,
+        color: courseColorMap[session.course_id] || 'blue',
+        capacity: room?.capacity || 0,
+      }
+    })
+  }, [currentSchedule, courseMap, roomMap, buildingMap])
 
   const handleExport = (format: string) => {
     // In a real app, this would trigger actual export
@@ -95,12 +154,42 @@ function SchedulePage() {
     window.print()
   }
 
+  const uniqueCourses = [...new Set(sessions.map(s => s.course))]
+  const uniqueRooms = [...new Set(sessions.map(s => s.room))]
+  const totalCapacity = sessions.reduce((sum, s) => sum + s.capacity, 0)
+
   const stats = [
     { title: 'Classes', value: sessions.length.toString(), icon: Calendar, iconBg: 'bg-blue-500/10', iconColor: 'text-blue-500' },
-    { title: 'Courses', value: [...new Set(sessions.map(s => s.course))].length.toString(), icon: BookOpen, iconBg: 'bg-violet-500/10', iconColor: 'text-violet-500' },
-    { title: 'Rooms', value: [...new Set(sessions.map(s => s.room))].length.toString(), icon: DoorOpen, iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500' },
-    { title: 'Students', value: sessions.reduce((sum, s) => sum + s.enrolled, 0).toString(), icon: Users, iconBg: 'bg-amber-500/10', iconColor: 'text-amber-500' },
+    { title: 'Courses', value: uniqueCourses.length.toString(), icon: BookOpen, iconBg: 'bg-violet-500/10', iconColor: 'text-violet-500' },
+    { title: 'Rooms', value: uniqueRooms.length.toString(), icon: DoorOpen, iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500' },
+    { title: 'Total Capacity', value: totalCapacity.toString(), icon: Users, iconBg: 'bg-amber-500/10', iconColor: 'text-amber-500' },
   ]
+
+  if (schedulesLoading) {
+    return (
+      <div className="flex flex-1 flex-col gap-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Your Timetable</h1>
+            <p className="text-muted-foreground">See when and where classes happen</p>
+          </div>
+        </div>
+        <CardListSkeleton cards={4} />
+      </div>
+    )
+  }
+
+  if (schedulesError) {
+    return (
+      <div className="flex flex-1 flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Your Timetable</h1>
+          <p className="text-muted-foreground">See when and where classes happen</p>
+        </div>
+        <ErrorState message="Failed to load schedules" onRetry={() => refetchSchedules()} />
+      </div>
+    )
+  }
 
   const formatHour = (hour: number) => {
     const h = Math.floor(hour)
@@ -139,15 +228,24 @@ function SchedulePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select defaultValue="fall-2024">
-            <SelectTrigger className="w-44">
+          <Select
+            value={currentSchedule?.id || ''}
+            onValueChange={setSelectedScheduleId}
+          >
+            <SelectTrigger className="w-52">
               <Calendar className="mr-2 size-4" />
               <SelectValue placeholder="Select schedule" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="fall-2024">Fall 2024</SelectItem>
-              <SelectItem value="summer-2024">Summer 2024</SelectItem>
-              <SelectItem value="spring-2024">Spring 2024</SelectItem>
+              {schedules.length === 0 ? (
+                <SelectItem value="none" disabled>No schedules available</SelectItem>
+              ) : (
+                schedules.map((schedule) => (
+                  <SelectItem key={schedule.id} value={schedule.id}>
+                    {schedule.name}
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
           <DropdownMenu>
@@ -178,19 +276,16 @@ function SchedulePage() {
         </div>
       </div>
 
-      {/* Conflict Warning Banner */}
-      {showConflictWarning && conflicts.length > 0 && (
-        <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
-          <AlertTriangle className="size-5 text-amber-500 shrink-0" />
+      {/* Empty State */}
+      {schedules.length === 0 && (
+        <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50 border">
+          <Calendar className="size-5 text-muted-foreground shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-500">Heads up!</p>
+            <p className="text-sm font-medium">No schedules yet</p>
             <p className="text-sm text-muted-foreground">
-              {conflicts[0].message}
+              Generate a schedule to see your timetable here
             </p>
           </div>
-          <Button variant="ghost" size="icon" className="size-8" onClick={() => setShowConflictWarning(false)}>
-            <X className="size-4" />
-          </Button>
         </div>
       )}
 
@@ -302,7 +397,6 @@ function SchedulePage() {
                                 style={getSessionStyle(session.startHour, session.duration)}
                               >
                                 <div className={`text-xs font-semibold ${colors.text}`}>{session.course}</div>
-                                <div className="text-xs text-foreground/80 truncate">{session.name}</div>
                                 <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                                   <DoorOpen className="size-3" />
                                   {session.room}
@@ -324,6 +418,7 @@ function SchedulePage() {
           <div className="grid gap-4 md:grid-cols-2">
             {[...new Set(sessions.map(s => s.room))].map((room) => {
               const roomSessions = sessions.filter(s => s.room === room)
+              const firstSession = roomSessions[0]
               return (
                 <Card key={room} className="overflow-hidden">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 border-b">
@@ -333,7 +428,7 @@ function SchedulePage() {
                       </div>
                       <div>
                         <CardTitle className="text-base leading-none">{room}</CardTitle>
-                        <CardDescription className="mt-1">Science Building</CardDescription>
+                        <CardDescription className="mt-1">{firstSession?.building || 'Unknown Building'}</CardDescription>
                       </div>
                     </div>
                     <Badge variant="secondary">{roomSessions.length} sessions</Badge>
@@ -352,7 +447,6 @@ function SchedulePage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className={`text-sm font-semibold ${colors.text}`}>{session.course}</span>
-                                <span className="text-sm text-muted-foreground truncate">{session.name}</span>
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 {session.day} • {formatHour(session.startHour)} - {formatHour(session.startHour + session.duration)}
@@ -360,7 +454,7 @@ function SchedulePage() {
                             </div>
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
                               <Users className="size-3" />
-                              {session.enrolled}
+                              {session.capacity}
                             </div>
                           </div>
                         )
@@ -376,18 +470,17 @@ function SchedulePage() {
         {/* By Course View */}
         <TabsContent value="course">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[...new Set(sessions.map(s => s.course))].map((courseCode) => {
-              const courseSessions = sessions.filter(s => s.course === courseCode)
-              const course = courseSessions[0]
-              const colors = getColorClasses(course.color)
+            {[...new Set(sessions.map(s => s.course))].map((courseName) => {
+              const courseSessions = sessions.filter(s => s.course === courseName)
+              const firstSession = courseSessions[0]
+              const colors = getColorClasses(firstSession.color)
               return (
-                <Card key={courseCode} className="overflow-hidden">
+                <Card key={courseName} className="overflow-hidden">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 border-b">
                     <div className="flex items-center gap-3">
                       <div className={`w-1 h-10 rounded-full ${colors.border.replace('border-l-', 'bg-')}`} />
                       <div>
-                        <CardTitle className={`text-base leading-none ${colors.text}`}>{courseCode}</CardTitle>
-                        <CardDescription className="mt-1">{course.name}</CardDescription>
+                        <CardTitle className={`text-base leading-none ${colors.text}`}>{courseName}</CardTitle>
                       </div>
                     </div>
                     <Badge variant="secondary">{courseSessions.length}x/week</Badge>
@@ -414,7 +507,7 @@ function SchedulePage() {
                             </Badge>
                             <div className="text-xs text-muted-foreground flex items-center justify-end gap-1">
                               <Users className="size-3" />
-                              {session.enrolled} students
+                              {session.capacity} seats
                             </div>
                           </div>
                         </div>
@@ -437,7 +530,7 @@ function SchedulePage() {
                 <DialogTitle className={getColorClasses(selectedSession.color).text}>
                   {selectedSession.course}
                 </DialogTitle>
-                <DialogDescription>{selectedSession.name}</DialogDescription>
+                <DialogDescription>{selectedSession.courseName}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -464,23 +557,12 @@ function SchedulePage() {
                   </div>
                 </div>
                 <Separator />
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Instructor</p>
-                    <p className="text-sm font-medium">{selectedSession.instructor}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Enrollment</p>
-                    <p className="text-sm font-medium flex items-center gap-2">
-                      <Users className="size-4" />
-                      {selectedSession.enrolled} / {selectedSession.capacity}
-                    </p>
-                    {selectedSession.enrolled >= selectedSession.capacity && (
-                      <Badge variant="outline" className="text-amber-500 border-amber-500/20 bg-amber-500/10">
-                        Full
-                      </Badge>
-                    )}
-                  </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Room Capacity</p>
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Users className="size-4" />
+                    {selectedSession.capacity} seats
+                  </p>
                 </div>
               </div>
             </>

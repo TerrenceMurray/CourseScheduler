@@ -18,45 +18,42 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { NumberInput } from '@/components/ui/number-input'
-import { BookOpen, FlaskConical, Users, Clock, Hash } from 'lucide-react'
+import { BookOpen, FlaskConical, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface CreateCourseModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit?: (course: CourseFormData) => void
+  roomTypes?: string[]
 }
 
 interface CourseFormData {
-  code: string
   name: string
   type: string
   sessions: number
   sessionDuration: number
-  enrolled: number
+  requiredRoom: string
 }
 
-export function CreateCourseModal({ open, onOpenChange, onSubmit }: CreateCourseModalProps) {
+export function CreateCourseModal({ open, onOpenChange, onSubmit, roomTypes = [] }: CreateCourseModalProps) {
   const [formData, setFormData] = useState<CourseFormData>({
-    code: '',
     name: '',
     type: 'Lecture',
     sessions: 2,
     sessionDuration: 1.5,
-    enrolled: 30,
+    requiredRoom: '',
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onSubmit?.(formData)
-    onOpenChange(false)
     setFormData({
-      code: '',
       name: '',
       type: 'Lecture',
       sessions: 2,
       sessionDuration: 1.5,
-      enrolled: 30,
+      requiredRoom: '',
     })
   }
 
@@ -122,40 +119,42 @@ export function CreateCourseModal({ open, onOpenChange, onSubmit }: CreateCourse
             </div>
           </div>
 
-          {/* Course Details */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="code" className="text-sm">
-                  <Hash className="inline size-3 mr-1 text-muted-foreground" />
-                  Course Code
-                </Label>
-                <Input
-                  id="code"
-                  placeholder="CS101"
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  className="font-mono"
-                  required
-                />
-              </div>
-              <div className="col-span-2 space-y-2">
-                <Label htmlFor="name" className="text-sm">Course Name</Label>
-                <Input
-                  id="name"
-                  placeholder="Introduction to Computer Science"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
+          {/* Course Name */}
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-sm">Course Name</Label>
+            <Input
+              id="name"
+              placeholder="e.g., Introduction to Computer Science"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
           </div>
 
-          {/* Schedule & Capacity */}
+          {/* Required Room Type */}
+          <div className="space-y-2">
+            <Label htmlFor="requiredRoom" className="text-sm">Required Room Type</Label>
+            <Select
+              value={formData.requiredRoom}
+              onValueChange={(value) => setFormData({ ...formData, requiredRoom: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a room type" />
+              </SelectTrigger>
+              <SelectContent>
+                {roomTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Schedule */}
           <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
-            <p className="text-sm font-medium text-muted-foreground">Schedule & Capacity</p>
-            <div className="grid grid-cols-3 gap-4">
+            <p className="text-sm font-medium text-muted-foreground">Schedule</p>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="sessions" className="text-sm flex items-center gap-1">
                   <Clock className="size-3 text-muted-foreground" />
@@ -186,28 +185,13 @@ export function CreateCourseModal({ open, onOpenChange, onSubmit }: CreateCourse
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="enrolled" className="text-sm flex items-center gap-1">
-                  <Users className="size-3 text-muted-foreground" />
-                  Enrolled
-                </Label>
-                <NumberInput
-                  value={formData.enrolled}
-                  onChange={(value) => setFormData({ ...formData, enrolled: value })}
-                  min={0}
-                  max={500}
-                  step={5}
-                />
-              </div>
             </div>
           </div>
 
           {/* Summary */}
-          {formData.code && formData.name && (
+          {formData.name && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
               <p className="text-sm">
-                <span className="font-mono font-semibold text-primary">{formData.code}</span>
-                {' '}&middot;{' '}
                 <span className="font-medium">{formData.name}</span>
                 {' '}&middot;{' '}
                 <span className="text-muted-foreground">
@@ -221,7 +205,9 @@ export function CreateCourseModal({ open, onOpenChange, onSubmit }: CreateCourse
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">Create Course</Button>
+            <Button type="submit" disabled={!formData.name || !formData.requiredRoom}>
+              Create Course
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

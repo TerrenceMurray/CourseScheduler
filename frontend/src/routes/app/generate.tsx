@@ -25,6 +25,8 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { CountUp } from '@/components/count-up'
+import { useCourses, useSessions, useRooms, useGenerateAndSaveSchedule } from '@/hooks'
+import type { FailedSession } from '@/types/api'
 
 export const Route = createFileRoute('/app/generate')({
   component: GeneratePage,
@@ -34,10 +36,16 @@ function GeneratePage() {
   const [scheduleName, setScheduleName] = useState('')
   const [operatingHours, setOperatingHours] = useState([8, 18])
   const [selectedDays, setSelectedDays] = useState(['mon', 'tue', 'wed', 'thu', 'fri'])
-  const [isGenerating, setIsGenerating] = useState(false)
   const [progress, setProgress] = useState(0)
   const [currentStep, setCurrentStep] = useState('')
-  const [result, setResult] = useState<null | { success: number; failed: number; conflicts: number; failures: string[] }>(null)
+  const [result, setResult] = useState<null | { success: number; failed: number; failures: FailedSession[] }>(null)
+
+  const { data: courses = [] } = useCourses()
+  const { data: sessions = [] } = useSessions()
+  const { data: rooms = [] } = useRooms()
+  const generateSchedule = useGenerateAndSaveSchedule()
+
+  const isGenerating = generateSchedule.isPending
 
   const days = [
     { id: 'mon', label: 'Mon', full: 'Monday' },
@@ -71,27 +79,60 @@ function GeneratePage() {
   }
 
   const handleGenerate = async () => {
-    setIsGenerating(true)
     setProgress(0)
     setResult(null)
 
-    for (let i = 0; i <= 100; i += 5) {
-      await new Promise((resolve) => setTimeout(resolve, 100))
-      setProgress(i)
-      setCurrentStep(steps[Math.floor(i / 20)] || steps[steps.length - 1])
+    // Map day IDs to day numbers (0 = Monday, 6 = Sunday)
+    const dayMap: Record<string, number> = {
+      'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6
+    }
+    const operatingDays = selectedDays.map(d => dayMap[d]).sort()
+
+    // Convert hours to minutes from midnight
+    const operatingHoursConfig = {
+      Start: operatingHours[0] * 60,
+      End: operatingHours[1] * 60,
     }
 
-    setResult({
-      success: 142,
-      failed: 3,
-      conflicts: 0,
-      failures: [
-        'CS401 Advanced Topics - No available time slot within operating hours',
-        'PHYS301 Quantum Mechanics - Required room type (Lab) unavailable',
-        'ART201 Studio Practice - Enrollment (45) exceeds available room capacity',
-      ],
-    })
-    setIsGenerating(false)
+    // Simulate progress for better UX
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) return prev
+        const step = Math.floor(prev / 20)
+        setCurrentStep(steps[step] || steps[steps.length - 1])
+        return prev + 10
+      })
+    }, 200)
+
+    generateSchedule.mutate(
+      {
+        name: scheduleName,
+        config: {
+          OperatingHours: operatingHoursConfig,
+          OperatingDays: operatingDays,
+        },
+      },
+      {
+        onSuccess: (response) => {
+          clearInterval(progressInterval)
+          setProgress(100)
+          setCurrentStep('Done!')
+
+          const scheduledCount = response.output?.ScheduledSessions?.length || response.schedule?.sessions?.length || 0
+          const failures = response.failures || response.output?.Failures || []
+
+          setResult({
+            success: scheduledCount,
+            failed: failures.length,
+            failures: failures,
+          })
+        },
+        onError: () => {
+          clearInterval(progressInterval)
+          setProgress(0)
+        },
+      }
+    )
   }
 
   const handleReset = () => {
@@ -103,10 +144,9 @@ function GeneratePage() {
   }
 
   const resourceSummary = {
-    courses: 24,
-    sessions: 145,
-    rooms: 18,
-    buildings: 3,
+    courses: courses.length,
+    sessions: sessions.length,
+    rooms: rooms.length,
   }
 
   return (
@@ -371,7 +411,14 @@ function GeneratePage() {
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-500/10">
                     <Zap className="size-8 text-blue-500" />
                     <div>
-                      <p className="text-2xl font-bold text-blue-500"><CountUp value="98" suffix="%" /></p>
+                      <p className="text-2xl font-bold text-blue-500">
+                        <CountUp
+                          value={result.success + result.failed > 0
+                            ? Math.round((result.success / (result.success + result.failed)) * 100).toString()
+                            : "0"}
+                          suffix="%"
+                        />
+                      </p>
                       <p className="text-xs text-muted-foreground">Complete</p>
                     </div>
                   </div>
@@ -397,12 +444,16 @@ function GeneratePage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                {result.failures.map((failure, i) => (
-                  <div key={i} className="p-2 rounded-lg bg-rose-500/5 border border-rose-500/10">
-                    <p className="text-xs text-muted-foreground">{failure}</p>
-                  </div>
-                ))}
-                <Button variant="outline" size="sm" className="w-full mt-2">
+                {result.failures.map((failure, i) => {
+                  const courseName = courses.find(c => c.id === failure.CourseSession?.course_id)?.name || 'Unknown Course'
+                  return (
+                    <div key={i} className="p-2 rounded-lg bg-rose-500/5 border border-rose-500/10">
+                      <p className="text-xs font-medium">{courseName}</p>
+                      <p className="text-xs text-muted-foreground">{failure.Reason}</p>
+                    </div>
+                  )
+                })}
+                <Button variant="outline" size="sm" className="w-full mt-2" onClick={handleReset}>
                   <Settings2 className="mr-2 size-3" />
                   Try Different Settings
                 </Button>
