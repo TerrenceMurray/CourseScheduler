@@ -1,23 +1,35 @@
 {
   "name": "course-scheduler",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "University course scheduling application",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "backend:build": "task build",
-    "backend:install": "task install",
-    "backend:run": "task run",
-    "backend:unit-test": "task test-unit",
-    "schema:new": "task schema-new -- ",
-    "schema:up": "task migrate-up",
-    "schema:down": "task migrate-down",
-    "schema:generate-models": "task jet-gen"
+    "setup": "npm run install:all && echo '✅ Setup complete! Run: npm run dev'",
+    "install:all": "npm install && cd frontend && pnpm install && cd .. && task install",
+    "dev": "concurrently -n backend,frontend -c blue,green \"task run\" \"cd frontend && pnpm dev\"",
+    "dev:backend": "task run",
+    "dev:frontend": "cd frontend && pnpm dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "task build",
+    "build:frontend": "cd frontend && pnpm build",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "task test-unit",
+    "test:frontend": "cd frontend && pnpm test",
+    "db:migrate": "task migrate:up",
+    "db:rollback": "task migrate:down",
+    "db:new": "task schema-new --",
+    "db:generate": "task jet-gen"
   },
-  "keywords": [],
+  "keywords": [
+    "scheduler",
+    "university",
+    "courses",
+    "timetable"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "shadcn": "^3.6.2"
   }
 }

@@ -8,8 +8,10 @@ import {
   Users,
   Pencil,
   Trash2,
+  Search,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -24,6 +26,8 @@ import type { Building } from '@/types/api'
 import { useRooms } from '@/hooks'
 import { CardListSkeleton } from '@/components/loading-skeleton'
 import { ErrorState } from '@/components/error-state'
+import { EmptyState } from '@/components/empty-state'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 
 export const Route = createFileRoute('/app/buildings')({
   component: BuildingsPage,
@@ -33,6 +37,9 @@ function BuildingsPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingBuilding, setEditingBuilding] = useState<Building | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [buildingToDelete, setBuildingToDelete] = useState<Building | null>(null)
 
   const { data: buildings = [], isLoading, isError, refetch } = useBuildings()
   const { data: rooms = [] } = useRooms()
@@ -61,14 +68,31 @@ function BuildingsPage() {
   const totalRooms = rooms.length
   const totalCapacity = rooms.reduce((sum, r) => sum + r.capacity, 0)
 
+  // Filter buildings by search query
+  const filteredBuildings = buildings.filter(building =>
+    building.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   const handleCreate = (data: { name: string }) => {
     createBuilding.mutate({ name: data.name }, {
       onSuccess: () => setCreateModalOpen(false),
     })
   }
 
-  const handleDelete = (id: string) => {
-    deleteBuilding.mutate(id)
+  const handleDeleteClick = (building: Building) => {
+    setBuildingToDelete(building)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = () => {
+    if (buildingToDelete) {
+      deleteBuilding.mutate(buildingToDelete.id, {
+        onSuccess: () => {
+          setDeleteDialogOpen(false)
+          setBuildingToDelete(null)
+        },
+      })
+    }
   }
 
   const handleEdit = (building: Building) => {
@@ -148,6 +172,7 @@ function BuildingsPage() {
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
         onSubmit={handleCreate}
+        isLoading={createBuilding.isPending}
       />
 
       <EditBuildingModal
@@ -156,6 +181,17 @@ function BuildingsPage() {
         onSubmit={handleUpdate}
         building={editingBuilding}
         isLoading={updateBuilding.isPending}
+      />
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Building"
+        description={`Are you sure you want to delete "${buildingToDelete?.name}"? This action cannot be undone. Any rooms in this building will need to be reassigned.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={handleConfirmDelete}
+        isLoading={deleteBuilding.isPending}
       />
 
       {/* Summary Stats */}
@@ -197,12 +233,47 @@ function BuildingsPage() {
 
       {/* Buildings Grid */}
       <div>
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold">All Buildings</h2>
-          <p className="text-sm text-muted-foreground">Click on a building to manage its rooms</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold">All Buildings</h2>
+            <p className="text-sm text-muted-foreground">Click on a building to manage its rooms</p>
+          </div>
+          {buildings.length > 0 && (
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input
+                placeholder="Search buildings..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          )}
         </div>
+
+        {buildings.length === 0 ? (
+          <EmptyState
+            icon={Building2}
+            title="No buildings yet"
+            description="Buildings are the first step in setting up your schedule. Add campus buildings where classes will be held."
+            action={{
+              label: "Add First Building",
+              onClick: () => setCreateModalOpen(true),
+            }}
+          />
+        ) : filteredBuildings.length === 0 ? (
+          <EmptyState
+            icon={Search}
+            title="No buildings found"
+            description={`No buildings match "${searchQuery}". Try a different search term.`}
+            action={{
+              label: "Clear Search",
+              onClick: () => setSearchQuery(''),
+            }}
+          />
+        ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {buildings.map((building, index) => {
+          {filteredBuildings.map((building, index) => {
             const colorClasses = getColorClasses(index)
             const roomCount = buildingRoomCounts[building.id] || 0
             const capacity = buildingCapacity[building.id] || 0
@@ -244,7 +315,7 @@ function BuildingsPage() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive"
-                          onClick={() => handleDelete(building.id)}
+                          onClick={() => handleDeleteClick(building)}
                         >
                           <Trash2 className="mr-2 size-4" />
                           Delete
@@ -303,6 +374,7 @@ function BuildingsPage() {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
     </div>
   )

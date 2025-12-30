@@ -16,13 +16,21 @@ import {
   ChevronRight,
   Zap,
   Target,
+  CalendarDays,
 } from 'lucide-react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CountUp } from '@/components/count-up'
 import { Progress } from '@/components/ui/progress'
-import { useCourses, useRooms, useBuildings, useSchedules } from '@/hooks'
+import { SetupWizard } from '@/components/setup-wizard'
+import { useCourses, useRooms, useBuildings, useRoomTypes, useSchedules } from '@/hooks'
 
 export const Route = createFileRoute('/app/')({
   component: Dashboard,
@@ -41,7 +49,14 @@ function Dashboard() {
   const { data: courses = [] } = useCourses()
   const { data: rooms = [] } = useRooms()
   const { data: buildings = [] } = useBuildings()
+  const { data: roomTypes = [] } = useRoomTypes()
   const { data: schedules = [] } = useSchedules()
+
+  // Check if setup is complete
+  const isSetupComplete = buildings.length > 0 && roomTypes.length > 0 && rooms.length > 0 && courses.length > 0
+
+  // Hide setup wizard if a schedule has been generated
+  const hasSchedule = schedules.length > 0
 
   // Get most recent schedule
   const latestSchedule = schedules[0]
@@ -102,40 +117,127 @@ function Dashboard() {
   }, [schedules])
 
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
-  const hours = ['8AM', '9AM', '10AM', '11AM', '12PM', '1PM', '2PM', '3PM', '4PM']
-  const colorPalette = ['bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500']
+  const colorPalette = [
+    { bg: 'bg-blue-500', light: 'bg-blue-500/20', text: 'text-blue-600' },
+    { bg: 'bg-emerald-500', light: 'bg-emerald-500/20', text: 'text-emerald-600' },
+    { bg: 'bg-violet-500', light: 'bg-violet-500/20', text: 'text-violet-600' },
+    { bg: 'bg-amber-500', light: 'bg-amber-500/20', text: 'text-amber-600' },
+    { bg: 'bg-rose-500', light: 'bg-rose-500/20', text: 'text-rose-600' },
+    { bg: 'bg-cyan-500', light: 'bg-cyan-500/20', text: 'text-cyan-600' },
+  ]
+
+  // Get current day (0 = Sunday, 1 = Monday, etc.)
+  const today = new Date().getDay()
+  const currentDayIndex = today === 0 ? -1 : today - 1 // Mon = 0, Sun = -1 (not shown)
+  const currentHour = new Date().getHours()
+
+  // Build course color map
+  const courseColorMap = useMemo(() => {
+    const map: Record<string, typeof colorPalette[0]> = {}
+    let colorIndex = 0
+
+    if (latestSchedule?.sessions) {
+      for (const session of latestSchedule.sessions) {
+        if (!map[session.course_id]) {
+          map[session.course_id] = colorPalette[colorIndex % colorPalette.length]
+          colorIndex++
+        }
+      }
+    }
+    return map
+  }, [latestSchedule])
+
+  // Calculate dynamic hours based on session times
+  const hours = useMemo(() => {
+    if (!latestSchedule?.sessions?.length) {
+      return [8, 9, 10, 11, 12, 13, 14, 15, 16]
+    }
+
+    let earliest = 8
+    let latest = 17
+
+    for (const session of latestSchedule.sessions) {
+      const startHour = Math.floor(session.start_time / 60)
+      const endHour = Math.ceil(session.end_time / 60)
+      earliest = Math.min(earliest, startHour)
+      latest = Math.max(latest, endHour)
+    }
+
+    // Clamp to reasonable bounds
+    earliest = Math.max(5, earliest)
+    latest = Math.min(22, latest)
+
+    return Array.from({ length: latest - earliest }, (_, i) => i + earliest)
+  }, [latestSchedule])
 
   // Transform schedule sessions to preview format
   const previewSessions = useMemo(() => {
     if (!latestSchedule?.sessions) return []
 
-    const courseColorMap: Record<string, string> = {}
-    let colorIndex = 0
-
     return latestSchedule.sessions.map((session) => {
-      if (!courseColorMap[session.course_id]) {
-        courseColorMap[session.course_id] = colorPalette[colorIndex % colorPalette.length]
-        colorIndex++
-      }
-
       const startHour = Math.floor(session.start_time / 60)
-      const hourStr = startHour >= 12
-        ? `${startHour === 12 ? 12 : startHour - 12}PM`
-        : `${startHour}AM`
-
+      const endHour = Math.ceil(session.end_time / 60)
       const course = courses.find(c => c.id === session.course_id)
+      const room = rooms.find(r => r.id === session.room_id)
+
+      // Format time for display
+      const formatTime = (minutes: number) => {
+        const h = Math.floor(minutes / 60)
+        const m = minutes % 60
+        const period = h >= 12 ? 'PM' : 'AM'
+        const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+        return m === 0 ? `${hour12}${period}` : `${hour12}:${m.toString().padStart(2, '0')}${period}`
+      }
 
       return {
-        day: days[session.day] || 'Mon',
-        hour: hourStr,
-        color: courseColorMap[session.course_id],
-        name: course?.name || 'Unknown',
+        dayIndex: session.day,
+        startHour,
+        endHour,
+        duration: endHour - startHour,
+        color: courseColorMap[session.course_id] || colorPalette[0],
+        courseName: course?.name || 'Unknown',
+        roomName: room?.name || 'Unknown',
+        timeRange: `${formatTime(session.start_time)} - ${formatTime(session.end_time)}`,
+        courseId: session.course_id,
       }
     })
-  }, [latestSchedule, courses])
+  }, [latestSchedule, courses, rooms, courseColorMap])
 
-  const hasSession = (day: string, hour: string) => {
-    return previewSessions.find(s => s.day === day && s.hour === hour)
+  // Get sessions for a specific cell
+  const getSessionsForCell = (dayIndex: number, hour: number) => {
+    return previewSessions.filter(s =>
+      s.dayIndex === dayIndex &&
+      hour >= s.startHour &&
+      hour < s.endHour
+    )
+  }
+
+  // Check if this is the first hour of a session
+  const isSessionStart = (dayIndex: number, hour: number) => {
+    return previewSessions.find(s => s.dayIndex === dayIndex && s.startHour === hour)
+  }
+
+  // Get unique courses for legend
+  const legendCourses = useMemo(() => {
+    const seen = new Set<string>()
+    return previewSessions
+      .filter(s => {
+        if (seen.has(s.courseId)) return false
+        seen.add(s.courseId)
+        return true
+      })
+      .slice(0, 6) // Limit to 6 for space
+      .map(s => ({
+        name: s.courseName,
+        color: s.color,
+      }))
+  }, [previewSessions])
+
+  // Format hour for display
+  const formatHour = (hour: number) => {
+    if (hour === 0) return '12AM'
+    if (hour === 12) return '12PM'
+    return hour > 12 ? `${hour - 12}PM` : `${hour}AM`
   }
 
   // Calculate total teaching hours from schedule
@@ -176,8 +278,18 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Tip Banner */}
-      {showTip && (
+      {/* Setup Wizard - Only show if no schedule generated yet */}
+      {!hasSchedule && (
+        <SetupWizard
+          buildingsCount={buildings.length}
+          roomTypesCount={roomTypes.length}
+          roomsCount={rooms.length}
+          coursesCount={courses.length}
+        />
+      )}
+
+      {/* Tip Banner - Only show when setup is complete or has schedule */}
+      {(isSetupComplete || hasSchedule) && showTip && (
         <div className="flex items-center gap-3 p-4 rounded-lg bg-gradient-to-r from-primary/5 via-primary/10 to-violet-500/5 border border-primary/10">
           <div className="rounded-full bg-primary/10 p-2">
             <Lightbulb className="size-4 text-primary" />
@@ -246,58 +358,136 @@ function Dashboard() {
                 </div>
               ))}
             </div>
-            {/* Day Headers */}
-            <div className="grid grid-cols-6 gap-1.5 mb-2">
-              <div />
-              {days.map((day) => (
-                <div key={day} className="text-xs font-medium text-center text-muted-foreground py-1">
-                  {day}
+
+            {previewSessions.length === 0 ? (
+              /* Empty State */
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="rounded-full bg-muted p-4 mb-4">
+                  <CalendarDays className="size-8 text-muted-foreground" />
                 </div>
-              ))}
-            </div>
-            {/* Time Grid */}
-            <div className="space-y-1.5">
-              {hours.map((hour) => (
-                <div key={hour} className="grid grid-cols-6 gap-1.5">
-                  <div className="text-xs text-muted-foreground text-right pr-2 flex items-center justify-end">
-                    {hour}
-                  </div>
-                  {days.map((day) => {
-                    const session = hasSession(day, hour)
+                <h3 className="font-medium mb-1">No Schedule Yet</h3>
+                <p className="text-sm text-muted-foreground mb-4 max-w-[240px]">
+                  Generate a schedule to see your weekly timetable here.
+                </p>
+                <Button size="sm" asChild>
+                  <Link to="/app/generate">
+                    <Sparkles className="mr-2 size-4" />
+                    Generate Schedule
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <TooltipProvider delayDuration={100}>
+                {/* Day Headers */}
+                <div className="grid grid-cols-6 gap-1.5 mb-2">
+                  <div />
+                  {days.map((day, dayIndex) => (
+                    <div
+                      key={day}
+                      className={`text-xs font-medium text-center py-1 rounded ${
+                        dayIndex === currentDayIndex
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
+                      {day}
+                      {dayIndex === currentDayIndex && (
+                        <span className="block text-[10px] font-normal">Today</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Time Grid */}
+                <div className="space-y-1">
+                  {hours.map((hour) => {
+                    const isCurrentHour = currentDayIndex >= 0 && hour === currentHour
                     return (
-                      <div
-                        key={`${day}-${hour}`}
-                        className={`h-6 rounded-md transition-all ${
-                          session
-                            ? `${session.color} cursor-pointer hover:opacity-80 hover:scale-105`
-                            : 'bg-muted/40 hover:bg-muted/60'
-                        }`}
-                        title={session ? `${session.name} - ${day} ${hour}` : undefined}
-                      />
+                      <div key={hour} className="grid grid-cols-6 gap-1.5 relative">
+                        {/* Current time indicator */}
+                        {isCurrentHour && (
+                          <div
+                            className="absolute left-0 right-0 h-0.5 bg-red-500 z-10 pointer-events-none"
+                            style={{ top: '50%' }}
+                          />
+                        )}
+                        <div className={`text-xs text-right pr-2 flex items-center justify-end ${
+                          isCurrentHour ? 'text-red-500 font-medium' : 'text-muted-foreground'
+                        }`}>
+                          {formatHour(hour)}
+                        </div>
+                        {days.map((day, dayIndex) => {
+                          const cellSessions = getSessionsForCell(dayIndex, hour)
+                          const startingSession = isSessionStart(dayIndex, hour)
+                          const isToday = dayIndex === currentDayIndex
+                          const isNow = isToday && hour === currentHour
+
+                          if (cellSessions.length === 0) {
+                            return (
+                              <div
+                                key={`${day}-${hour}`}
+                                className={`h-7 rounded-md transition-all ${
+                                  isToday
+                                    ? 'bg-primary/5 hover:bg-primary/10'
+                                    : 'bg-muted/40 hover:bg-muted/60'
+                                } ${isNow ? 'ring-1 ring-red-500/50' : ''}`}
+                              />
+                            )
+                          }
+
+                          const session = cellSessions[0]
+                          const isStart = startingSession?.courseId === session.courseId
+
+                          return (
+                            <Tooltip key={`${day}-${hour}`}>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={`h-7 rounded-md transition-all cursor-pointer hover:opacity-90 hover:scale-[1.02] ${session.color.bg} ${
+                                    isStart ? 'flex items-center justify-center overflow-hidden' : ''
+                                  } ${isNow ? 'ring-2 ring-red-500' : ''}`}
+                                >
+                                  {isStart && (
+                                    <span className="text-[10px] font-medium text-white truncate px-1">
+                                      {session.courseName.length > 8
+                                        ? session.courseName.substring(0, 8) + '…'
+                                        : session.courseName}
+                                    </span>
+                                  )}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[200px]">
+                                <div className="space-y-1">
+                                  <p className="font-medium">{session.courseName}</p>
+                                  <p className="text-xs text-muted-foreground">{session.timeRange}</p>
+                                  <p className="text-xs text-muted-foreground">{session.roomName}</p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          )
+                        })}
+                      </div>
                     )
                   })}
                 </div>
-              ))}
-            </div>
-            {/* Legend */}
-            <div className="flex gap-4 mt-4 pt-4 border-t">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <div className="size-3 rounded bg-blue-500" />
-                <span>Computer Science</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <div className="size-3 rounded bg-emerald-500" />
-                <span>Mathematics</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <div className="size-3 rounded bg-violet-500" />
-                <span>Data Structures</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <div className="size-3 rounded bg-amber-500" />
-                <span>Physics</span>
-              </div>
-            </div>
+
+                {/* Dynamic Legend */}
+                {legendCourses.length > 0 && (
+                  <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t">
+                    {legendCourses.map((course) => (
+                      <div key={course.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className={`size-2.5 rounded ${course.color.bg}`} />
+                        <span className="truncate max-w-[100px]">{course.name}</span>
+                      </div>
+                    ))}
+                    {previewSessions.length > legendCourses.length && (
+                      <span className="text-xs text-muted-foreground">
+                        +{new Set(previewSessions.map(s => s.courseId)).size - legendCourses.length} more
+                      </span>
+                    )}
+                  </div>
+                )}
+              </TooltipProvider>
+            )}
           </CardContent>
         </Card>
 

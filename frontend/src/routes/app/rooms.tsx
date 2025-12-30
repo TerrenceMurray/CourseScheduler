@@ -286,45 +286,48 @@ function RoomsPage() {
               <CardTitle>All Rooms</CardTitle>
               <CardDescription>Browse and manage room inventory</CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative w-full sm:w-auto">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Search rooms..."
-                  className="pl-9 w-48"
+                  className="pl-9 w-full sm:w-48"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <Select value={buildingFilter} onValueChange={setBuildingFilter}>
-                <SelectTrigger className="w-44">
-                  <Building2 className="mr-2 size-4" />
-                  <SelectValue placeholder="Building" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Buildings</SelectItem>
-                  {buildings.map(b => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-44">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {roomTypes.map(rt => (
-                    <SelectItem key={rt.name} value={rt.name}>{rt.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex flex-1 sm:flex-initial gap-2">
+                <Select value={buildingFilter} onValueChange={setBuildingFilter}>
+                  <SelectTrigger className="flex-1 sm:w-36">
+                    <Building2 className="mr-2 size-4 hidden sm:block" />
+                    <SelectValue placeholder="Building" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Buildings</SelectItem>
+                    {buildings.map(b => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="flex-1 sm:w-36">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    {roomTypes.map(rt => (
+                      <SelectItem key={rt.name} value={rt.name}>{rt.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex border rounded-md">
                 <Button
                   variant="ghost"
                   size="icon"
                   className={`size-9 rounded-r-none ${viewMode === 'grid' ? 'bg-muted' : ''}`}
                   onClick={() => setViewMode('grid')}
+                  aria-label="Grid view"
                 >
                   <LayoutGrid className="size-4" />
                 </Button>
@@ -333,6 +336,7 @@ function RoomsPage() {
                   size="icon"
                   className={`size-9 rounded-l-none ${viewMode === 'list' ? 'bg-muted' : ''}`}
                   onClick={() => setViewMode('list')}
+                  aria-label="List view"
                 >
                   <List className="size-4" />
                 </Button>

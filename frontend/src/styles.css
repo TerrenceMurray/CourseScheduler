@@ -224,6 +224,27 @@ code {
 .animate-stagger > *:nth-child(7) { animation-delay: 0.35s; }
 .animate-stagger > *:nth-child(8) { animation-delay: 0.4s; }
 
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-fade-in,
+  .animate-slide-up,
+  .animate-slide-in-right,
+  .animate-stagger > * {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
 /* Touch-friendly styling for mobile */
 @media (hover: none) and (pointer: coarse) {
   button, [role="button"], a {

@@ -8,8 +8,10 @@ import {
   Pencil,
   Trash2,
   Users,
+  Search,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -25,6 +27,8 @@ import type { RoomType } from '@/types/api'
 import { useRooms } from '@/hooks'
 import { CardListSkeleton } from '@/components/loading-skeleton'
 import { ErrorState } from '@/components/error-state'
+import { EmptyState } from '@/components/empty-state'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 
 export const Route = createFileRoute('/app/room-types')({
   component: RoomTypesPage,
@@ -34,6 +38,9 @@ function RoomTypesPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingRoomType, setEditingRoomType] = useState<RoomType | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [typeToDelete, setTypeToDelete] = useState<RoomType | null>(null)
 
   const { data: roomTypes = [], isLoading, isError, refetch } = useRoomTypes()
   const { data: rooms = [] } = useRooms()
@@ -66,14 +73,31 @@ function RoomTypesPage() {
   const totalRooms = rooms.length
   const totalCapacity = rooms.reduce((sum, r) => sum + r.capacity, 0)
 
+  // Filter room types by search query
+  const filteredRoomTypes = roomTypes.filter(type =>
+    type.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   const handleCreate = (data: { name: string }) => {
     createRoomType.mutate({ name: data.name }, {
       onSuccess: () => setCreateModalOpen(false),
     })
   }
 
-  const handleDelete = (name: string) => {
-    deleteRoomType.mutate(name)
+  const handleDeleteClick = (type: RoomType) => {
+    setTypeToDelete(type)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = () => {
+    if (typeToDelete) {
+      deleteRoomType.mutate(typeToDelete.name, {
+        onSuccess: () => {
+          setDeleteDialogOpen(false)
+          setTypeToDelete(null)
+        },
+      })
+    }
   }
 
   const handleEdit = (roomType: RoomType) => {
@@ -149,6 +173,7 @@ function RoomTypesPage() {
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
         onSubmit={handleCreate}
+        isLoading={createRoomType.isPending}
       />
 
       <EditRoomTypeModal
@@ -157,6 +182,17 @@ function RoomTypesPage() {
         onSubmit={handleUpdate}
         roomType={editingRoomType}
         isLoading={updateRoomType.isPending}
+      />
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Room Type"
+        description={`Are you sure you want to delete "${typeToDelete?.name}"? This action cannot be undone. Rooms of this type will need to be reassigned.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={handleConfirmDelete}
+        isLoading={deleteRoomType.isPending}
       />
 
       {/* Summary Stats */}
@@ -198,12 +234,47 @@ function RoomTypesPage() {
 
       {/* Room Types Grid */}
       <div>
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold">All Room Types</h2>
-          <p className="text-sm text-muted-foreground">Click on a type to view its rooms</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold">All Room Types</h2>
+            <p className="text-sm text-muted-foreground">Click on a type to view its rooms</p>
+          </div>
+          {roomTypes.length > 0 && (
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input
+                placeholder="Search room types..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          )}
         </div>
+
+        {roomTypes.length === 0 ? (
+          <EmptyState
+            icon={Tag}
+            title="No room types yet"
+            description="Room types help categorize your rooms (e.g., Lecture Hall, Lab, Tutorial Room). Create types before adding rooms."
+            action={{
+              label: "Add First Room Type",
+              onClick: () => setCreateModalOpen(true),
+            }}
+          />
+        ) : filteredRoomTypes.length === 0 ? (
+          <EmptyState
+            icon={Search}
+            title="No room types found"
+            description={`No room types match "${searchQuery}". Try a different search term.`}
+            action={{
+              label: "Clear Search",
+              onClick: () => setSearchQuery(''),
+            }}
+          />
+        ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {roomTypes.map((type, index) => {
+          {filteredRoomTypes.map((type, index) => {
             const colorClasses = getColorClasses(index)
             const roomCount = roomCountByType[type.name] || 0
             const capacity = capacityByType[type.name] || 0
@@ -241,7 +312,7 @@ function RoomTypesPage() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive"
-                          onClick={() => handleDelete(type.name)}
+                          onClick={() => handleDeleteClick(type)}
                         >
                           <Trash2 className="mr-2 size-4" />
                           Delete
@@ -303,6 +374,7 @@ function RoomTypesPage() {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
     </div>
   )

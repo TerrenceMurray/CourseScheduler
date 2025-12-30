@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -10,31 +10,45 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Building2 } from 'lucide-react'
+import { Building2, Loader2 } from 'lucide-react'
 
 interface CreateBuildingModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit?: (building: BuildingFormData) => void
+  isLoading?: boolean
 }
 
 interface BuildingFormData {
   name: string
 }
 
-export function CreateBuildingModal({ open, onOpenChange, onSubmit }: CreateBuildingModalProps) {
+export function CreateBuildingModal({ open, onOpenChange, onSubmit, isLoading }: CreateBuildingModalProps) {
   const [formData, setFormData] = useState<BuildingFormData>({
     name: '',
   })
+  const [touched, setTouched] = useState(false)
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (open) {
+      setFormData({ name: '' })
+      setTouched(false)
+    }
+  }, [open])
+
+  const isValid = formData.name.trim().length > 0
+  const showError = touched && !isValid
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    setTouched(true)
+    if (!isValid) return
     onSubmit?.(formData)
-    setFormData({ name: '' })
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={isLoading ? undefined : onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="space-y-3">
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10">
@@ -56,15 +70,30 @@ export function CreateBuildingModal({ open, onOpenChange, onSubmit }: CreateBuil
               placeholder="e.g., Science Building"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
+              onBlur={() => setTouched(true)}
+              disabled={isLoading}
+              aria-invalid={showError}
+              className={showError ? 'border-destructive focus-visible:ring-destructive' : ''}
             />
+            {showError && (
+              <p className="text-xs text-destructive">Building name is required</p>
+            )}
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
               Cancel
             </Button>
-            <Button type="submit">Add Building</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                'Add Building'
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

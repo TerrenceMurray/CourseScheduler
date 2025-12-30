@@ -14,7 +14,6 @@ import {
   FileDown,
   MapPin,
   Building2,
-  Eye,
   EyeOff,
   Sparkles,
   CalendarDays,
@@ -94,7 +93,6 @@ function SchedulePage() {
   }, [])
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-  const hours = Array.from({ length: 12 }, (_, i) => i + 8) // 8AM to 7PM
 
   // Get current day and hour for highlighting
   const currentDayIndex = currentTime.getDay() - 1 // 0 = Monday
@@ -177,6 +175,30 @@ function SchedulePage() {
     return sessions.filter(s => !hiddenCourses.has(s.course))
   }, [sessions, hiddenCourses])
 
+  // Calculate dynamic grid hours based on session times
+  const { gridStartHour, gridEndHour, hours } = useMemo(() => {
+    if (sessions.length === 0) {
+      return { gridStartHour: 8, gridEndHour: 20, hours: Array.from({ length: 12 }, (_, i) => i + 8) }
+    }
+
+    // Find earliest start and latest end across all sessions
+    let earliest = 8
+    let latest = 20
+
+    for (const session of sessions) {
+      const sessionEnd = session.startHour + session.duration
+      earliest = Math.min(earliest, Math.floor(session.startHour))
+      latest = Math.max(latest, Math.ceil(sessionEnd))
+    }
+
+    // Ensure reasonable bounds (5 AM to 11 PM)
+    earliest = Math.max(5, earliest)
+    latest = Math.min(23, latest)
+
+    const hours = Array.from({ length: latest - earliest }, (_, i) => i + earliest)
+    return { gridStartHour: earliest, gridEndHour: latest, hours }
+  }, [sessions])
+
   const handleExport = (format: string) => {
     console.log(`Exporting as ${format}`)
   }
@@ -250,12 +272,6 @@ function SchedulePage() {
     return `${h}h ${m}min`
   }
 
-  const getSessionStyle = (startHour: number, duration: number) => {
-    const top = (startHour - 8) * 60
-    const height = duration * 60
-    return { top: `${top}px`, height: `${height}px` }
-  }
-
   const getColorClasses = (color: string) => {
     const colors: Record<string, { bg: string; border: string; text: string; solid: string }> = {
       blue: { bg: 'bg-blue-500/15', border: 'border-l-blue-500', text: 'text-blue-500', solid: 'bg-blue-500' },
@@ -275,42 +291,84 @@ function SchedulePage() {
   // Calculate overlapping sessions and their positions
   const getSessionsWithLayout = (daySessions: Session[]) => {
     if (daySessions.length === 0) return []
+    if (daySessions.length === 1) {
+      return [{ session: daySessions[0], column: 0, totalColumns: 1 }]
+    }
 
-    const sorted = [...daySessions].sort((a, b) => a.startHour - b.startHour)
-    const sessionLayouts: { session: Session; column: number; totalColumns: number }[] = []
-    const columns: { endHour: number; session: Session }[][] = []
+    // Sort by start time, then by duration (longer first)
+    const sorted = [...daySessions].sort((a, b) => {
+      if (a.startHour !== b.startHour) return a.startHour - b.startHour
+      return b.duration - a.duration
+    })
 
-    for (const session of sorted) {
-      const sessionEnd = session.startHour + session.duration
-      let placed = false
+    // Helper to check if two sessions overlap (inclusive of same start time)
+    const overlaps = (s1: Session, s2: Session): boolean => {
+      if (s1.id === s2.id) return false // Don't count self
+      const s1Start = s1.startHour
+      const s1End = s1.startHour + s1.duration
+      const s2Start = s2.startHour
+      const s2End = s2.startHour + s2.duration
+      // Two intervals overlap if one starts before the other ends
+      return s1Start < s2End && s2Start < s1End
+    }
 
-      for (let colIdx = 0; colIdx < columns.length; colIdx++) {
-        const column = columns[colIdx]
-        const lastInColumn = column[column.length - 1]
-        if (lastInColumn.endHour <= session.startHour) {
-          column.push({ endHour: sessionEnd, session })
-          sessionLayouts.push({ session, column: colIdx, totalColumns: 0 })
-          placed = true
-          break
+    // Build adjacency: for each session, find all overlapping sessions
+    const overlapGroups: Map<string, Set<string>> = new Map()
+    for (const s of sorted) {
+      overlapGroups.set(s.id, new Set())
+    }
+
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 1; j < sorted.length; j++) {
+        if (overlaps(sorted[i], sorted[j])) {
+          overlapGroups.get(sorted[i].id)!.add(sorted[j].id)
+          overlapGroups.get(sorted[j].id)!.add(sorted[i].id)
         }
-      }
-
-      if (!placed) {
-        columns.push([{ endHour: sessionEnd, session }])
-        sessionLayouts.push({ session, column: columns.length - 1, totalColumns: 0 })
       }
     }
 
-    for (const layout of sessionLayouts) {
-      const sessionStart = layout.session.startHour
-      const sessionEnd = layout.session.startHour + layout.session.duration
-      const overlapping = sessionLayouts.filter(other => {
-        const otherStart = other.session.startHour
-        const otherEnd = other.session.startHour + other.session.duration
-        return sessionStart < otherEnd && sessionEnd > otherStart
+    // Greedy graph coloring for column assignment
+    const sessionToColumn: Map<string, number> = new Map()
+
+    for (const session of sorted) {
+      // Find columns used by overlapping sessions
+      const usedColumns = new Set<number>()
+      const overlappingIds = overlapGroups.get(session.id) || new Set()
+
+      for (const otherId of overlappingIds) {
+        const col = sessionToColumn.get(otherId)
+        if (col !== undefined) {
+          usedColumns.add(col)
+        }
+      }
+
+      // Find first available column
+      let column = 0
+      while (usedColumns.has(column)) {
+        column++
+      }
+
+      sessionToColumn.set(session.id, column)
+    }
+
+    // Calculate total columns for each session based on its overlap group
+    const sessionLayouts: { session: Session; column: number; totalColumns: number }[] = []
+
+    for (const session of sorted) {
+      const column = sessionToColumn.get(session.id) ?? 0
+      const overlappingIds = overlapGroups.get(session.id) || new Set()
+
+      // Get all columns used in this overlap group (including self)
+      const columnsInGroup = new Set<number>([column])
+      for (const otherId of overlappingIds) {
+        columnsInGroup.add(sessionToColumn.get(otherId) ?? 0)
+      }
+
+      sessionLayouts.push({
+        session,
+        column,
+        totalColumns: columnsInGroup.size
       })
-      const usedColumns = new Set(overlapping.map(o => o.column))
-      layout.totalColumns = usedColumns.size
     }
 
     return sessionLayouts
@@ -593,11 +651,11 @@ function SchedulePage() {
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
+                <CardContent className="p-0 overflow-hidden">
+                  <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-400px)]">
                     <div className="min-w-[800px]">
                       {/* Day Headers */}
-                      <div className="grid grid-cols-[80px_repeat(5,1fr)] border-b sticky top-0 bg-background z-10">
+                      <div className="grid grid-cols-[80px_repeat(5,1fr)] border-b sticky top-0 bg-background z-30">
                         <div className="p-3 text-xs font-medium text-muted-foreground flex items-center justify-center">
                           <Clock className="size-4" />
                         </div>
@@ -630,7 +688,7 @@ function SchedulePage() {
                         {/* Time Labels */}
                         <div className="border-r">
                           {hours.map((hour) => (
-                            <div key={hour} className="h-[60px] border-b px-3 py-1">
+                            <div key={hour} className="h-15 border-b px-3 py-1">
                               <span className="text-xs text-muted-foreground">{formatHour(hour)}</span>
                             </div>
                           ))}
@@ -638,7 +696,13 @@ function SchedulePage() {
 
                         {/* Day Columns */}
                         {days.map((day, dayIdx) => {
-                          const daySessions = visibleSessions.filter((s) => s.day === day)
+                          // Filter to sessions for this day that are visible in the grid
+                          const daySessions = visibleSessions.filter((s) => {
+                            if (s.day !== day) return false
+                            const sessionEnd = s.startHour + s.duration
+                            // Include sessions that overlap with the visible grid
+                            return sessionEnd > gridStartHour && s.startHour < gridEndHour
+                          })
                           const sessionsWithLayout = getSessionsWithLayout(daySessions)
                           const isToday = dayIdx === currentDayIndex
 
@@ -646,7 +710,7 @@ function SchedulePage() {
                             <div
                               key={day}
                               className={cn(
-                                "relative border-l",
+                                "relative border-l overflow-visible",
                                 isToday && "bg-primary/5"
                               )}
                               style={{ height: `${hours.length * 60}px` }}
@@ -676,9 +740,21 @@ function SchedulePage() {
                               {/* Sessions */}
                               {sessionsWithLayout.map(({ session, column, totalColumns }) => {
                                 const colors = getColorClasses(session.color)
-                                const width = totalColumns > 1 ? `calc(${100 / totalColumns}% - 8px)` : 'calc(100% - 8px)'
-                                const left = totalColumns > 1 ? `calc(${(column / totalColumns) * 100}% + 4px)` : '4px'
+                                // Calculate width and position as percentages
+                                const padding = 4 // px padding on sides
+                                const gapBetween = 2 // px gap between overlapping sessions
+                                // Width per column in percentage
+                                const widthPercent = (100 / totalColumns)
                                 const isNow = isSessionNow(session)
+
+                                // Clip session to visible grid area
+                                const sessionEndHour = session.startHour + session.duration
+                                const visibleStartHour = Math.max(session.startHour, gridStartHour)
+                                const visibleEndHour = Math.min(sessionEndHour, gridEndHour)
+                                const visibleDuration = visibleEndHour - visibleStartHour
+
+                                const top = (visibleStartHour - gridStartHour) * 60
+                                const height = Math.max(40, visibleDuration * 60)
 
                                 return (
                                   <Tooltip key={session.id}>
@@ -686,27 +762,31 @@ function SchedulePage() {
                                       <div
                                         onClick={() => setSelectedSession(session)}
                                         className={cn(
-                                          "absolute rounded-lg border-l-4 px-2 py-1.5 cursor-pointer transition-all",
-                                          "hover:shadow-lg hover:z-10 hover:scale-[1.02]",
+                                          "absolute rounded-md border-l-[3px] px-1.5 py-1 cursor-pointer transition-all overflow-hidden shadow-sm",
+                                          "hover:shadow-md hover:z-10 hover:brightness-95",
                                           colors.bg,
                                           colors.border,
                                           isNow && "ring-2 ring-emerald-500 ring-offset-1"
                                         )}
                                         style={{
-                                          ...getSessionStyle(session.startHour, session.duration),
-                                          width,
-                                          left,
+                                          top: `${top + 1}px`,
+                                          height: `${height - 4}px`,
+                                          width: `calc(${widthPercent}% - ${padding + gapBetween}px)`,
+                                          left: `calc(${column * widthPercent}% + ${padding / 2 + (column > 0 ? gapBetween / 2 : 0)}px)`,
+                                          zIndex: column + 1,
                                         }}
                                       >
-                                        <div className={cn("text-xs font-semibold truncate", colors.text)}>
+                                        <div className={cn("text-[11px] font-semibold truncate leading-tight", colors.text)}>
                                           {session.course}
                                         </div>
-                                        <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5 truncate">
-                                          <DoorOpen className="size-3 shrink-0" />
-                                          <span className="truncate">{session.room}</span>
-                                        </div>
-                                        {session.duration >= 1.5 && (
-                                          <div className="text-[10px] text-muted-foreground mt-1">
+                                        {visibleDuration >= 0.75 && height >= 50 && (
+                                          <div className="text-[10px] text-muted-foreground flex items-center gap-1 truncate">
+                                            <DoorOpen className="size-2.5 shrink-0" />
+                                            <span className="truncate">{session.room}</span>
+                                          </div>
+                                        )}
+                                        {visibleDuration >= 1.5 && height >= 70 && (
+                                          <div className="text-[9px] text-muted-foreground mt-0.5">
                                             {formatHour(session.startHour)} - {formatHour(session.startHour + session.duration)}
                                           </div>
                                         )}
@@ -768,10 +848,10 @@ function SchedulePage() {
                         </div>
                       </CardHeader>
                       <CardContent className="p-0">
-                        <div className="divide-y max-h-72 overflow-y-auto">
+                        <div className="max-h-72 overflow-y-auto">
                           {roomSessions
                             .sort((a, b) => a.dayIndex - b.dayIndex || a.startHour - b.startHour)
-                            .map((session) => {
+                            .map((session, index) => {
                               const colors = getColorClasses(session.color)
                               const isNow = isSessionNow(session)
                               return (
@@ -779,11 +859,12 @@ function SchedulePage() {
                                   key={session.id}
                                   onClick={() => setSelectedSession(session)}
                                   className={cn(
-                                    "flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors cursor-pointer",
+                                    "flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer",
+                                    index > 0 && "border-t",
                                     isNow && "bg-emerald-500/5"
                                   )}
                                 >
-                                  <div className={cn("w-1 h-12 rounded-full", colors.solid)} />
+                                  <div className={cn("w-1 h-10 rounded-full", colors.solid)} />
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
                                       <span className={cn("text-sm font-semibold", colors.text)}>{session.course}</span>
@@ -838,17 +919,18 @@ function SchedulePage() {
                         </div>
                       </CardHeader>
                       <CardContent className="p-0">
-                        <div className="divide-y">
+                        <div>
                           {courseSessions
                             .sort((a, b) => a.dayIndex - b.dayIndex || a.startHour - b.startHour)
-                            .map((session) => {
+                            .map((session, index) => {
                               const isNow = isSessionNow(session)
                               return (
                                 <div
                                   key={session.id}
                                   onClick={() => setSelectedSession(session)}
                                   className={cn(
-                                    "flex items-center justify-between p-3 hover:bg-muted/30 transition-colors cursor-pointer",
+                                    "flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer",
+                                    index > 0 && "border-t",
                                     isNow && "bg-emerald-500/5"
                                   )}
                                 >
