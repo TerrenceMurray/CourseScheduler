@@ -429,6 +429,20 @@ function RoomsPage() {
                   </Card>
                 )
               })}
+
+              {/* Add New Card */}
+              <Card
+                className="flex items-center justify-center border-dashed cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors min-h-40"
+                onClick={() => setCreateModalOpen(true)}
+              >
+                <CardContent className="flex flex-col items-center gap-2 text-center p-6">
+                  <div className="rounded-full bg-muted p-3">
+                    <Plus className="size-5 text-muted-foreground" />
+                  </div>
+                  <p className="font-medium">Add New Room</p>
+                  <p className="text-sm text-muted-foreground">Register a new room</p>
+                </CardContent>
+              </Card>
             </div>
           ) : (
             <Table>

@@ -31,6 +31,8 @@ import { CountUp } from '@/components/count-up'
 import { Progress } from '@/components/ui/progress'
 import { SetupWizard } from '@/components/setup-wizard'
 import { useCourses, useRooms, useBuildings, useRoomTypes, useSchedules } from '@/hooks'
+import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState } from '@/components/error-state'
 
 export const Route = createFileRoute('/app/')({
   component: Dashboard,
@@ -46,11 +48,22 @@ function getGreeting() {
 function Dashboard() {
   const [showTip, setShowTip] = useState(true)
 
-  const { data: courses = [] } = useCourses()
-  const { data: rooms = [] } = useRooms()
-  const { data: buildings = [] } = useBuildings()
-  const { data: roomTypes = [] } = useRoomTypes()
-  const { data: schedules = [] } = useSchedules()
+  const { data: courses = [], isLoading: coursesLoading, isError: coursesError, refetch: refetchCourses } = useCourses()
+  const { data: rooms = [], isLoading: roomsLoading, isError: roomsError, refetch: refetchRooms } = useRooms()
+  const { data: buildings = [], isLoading: buildingsLoading, isError: buildingsError, refetch: refetchBuildings } = useBuildings()
+  const { data: roomTypes = [], isLoading: roomTypesLoading, isError: roomTypesError, refetch: refetchRoomTypes } = useRoomTypes()
+  const { data: schedules = [], isLoading: schedulesLoading, isError: schedulesError, refetch: refetchSchedules } = useSchedules()
+
+  const isLoading = coursesLoading || roomsLoading || buildingsLoading || roomTypesLoading || schedulesLoading
+  const isError = coursesError || roomsError || buildingsError || roomTypesError || schedulesError
+
+  const handleRefetch = () => {
+    refetchCourses()
+    refetchRooms()
+    refetchBuildings()
+    refetchRoomTypes()
+    refetchSchedules()
+  }
 
   // Check if setup is complete
   const isSetupComplete = buildings.length > 0 && roomTypes.length > 0 && rooms.length > 0 && courses.length > 0
@@ -251,6 +264,136 @@ function Dashboard() {
     { icon: Zap, label: 'Rooms used', value: rooms.length.toString(), color: 'text-emerald-500' },
     { icon: Clock, label: 'Teaching hours', value: `${Math.round(totalTeachingHours)}h`, color: 'text-violet-500' },
   ]
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 flex-col gap-6">
+        {/* Header */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">{getGreeting()}</h1>
+            <p className="text-muted-foreground">Loading your dashboard...</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-9 w-28" />
+            <Skeleton className="h-9 w-36" />
+          </div>
+        </div>
+
+        {/* Stats Grid Skeleton */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="size-8 rounded-lg" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-12 mb-1" />
+                <Skeleton className="h-3 w-20" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Main Content Grid Skeleton */}
+        <div className="grid gap-6 lg:grid-cols-12">
+          {/* Weekly Preview Skeleton */}
+          <Card className="lg:col-span-8">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div>
+                <Skeleton className="h-5 w-24 mb-1" />
+                <Skeleton className="h-4 w-48" />
+              </div>
+              <Skeleton className="h-8 w-28" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4 mb-4 pb-4 border-b">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-4 w-24" />
+                ))}
+              </div>
+              <div className="space-y-2">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="grid grid-cols-6 gap-1.5">
+                    <Skeleton className="h-7 w-full" />
+                    {Array.from({ length: 5 }).map((_, j) => (
+                      <Skeleton key={j} className="h-7 w-full" />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Right Column Skeleton */}
+          <div className="lg:col-span-4 space-y-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <Skeleton className="h-5 w-28 mb-1" />
+                <Skeleton className="h-4 w-40" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="p-3 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                    </div>
+                    <Skeleton className="h-1.5 w-full" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <Skeleton className="h-5 w-24" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <Skeleton className="size-7 rounded-lg" />
+                    <div className="flex-1">
+                      <Skeleton className="h-4 w-16 mb-1" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Bottom Stats Row Skeleton */}
+        <div className="grid gap-4 md:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="flex items-center gap-4 p-6">
+                <Skeleton className="size-12 rounded-xl" />
+                <div className="flex-1">
+                  <Skeleton className="h-8 w-12 mb-1" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-1 flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{getGreeting()}</h1>
+          <p className="text-muted-foreground">Here's an overview of your scheduling system.</p>
+        </div>
+        <ErrorState message="Failed to load dashboard data" onRetry={handleRefetch} />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-6 animate-fade-in">

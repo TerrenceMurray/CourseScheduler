@@ -27,6 +27,8 @@ import { Separator } from '@/components/ui/separator'
 import { CountUp } from '@/components/count-up'
 import { useCourses, useSessions, useRooms, useGenerateAndSaveSchedule } from '@/hooks'
 import type { FailedSession } from '@/types/api'
+import { CardGridSkeleton } from '@/components/loading-skeleton'
+import { ErrorState } from '@/components/error-state'
 
 export const Route = createFileRoute('/app/generate')({
   component: GeneratePage,
@@ -40,10 +42,19 @@ function GeneratePage() {
   const [currentStep, setCurrentStep] = useState('')
   const [result, setResult] = useState<null | { success: number; failed: number; failures: FailedSession[] }>(null)
 
-  const { data: courses = [] } = useCourses()
-  const { data: sessions = [] } = useSessions()
-  const { data: rooms = [] } = useRooms()
+  const { data: courses = [], isLoading: coursesLoading, isError: coursesError, refetch: refetchCourses } = useCourses()
+  const { data: sessions = [], isLoading: sessionsLoading, isError: sessionsError, refetch: refetchSessions } = useSessions()
+  const { data: rooms = [], isLoading: roomsLoading, isError: roomsError, refetch: refetchRooms } = useRooms()
   const generateSchedule = useGenerateAndSaveSchedule()
+
+  const isLoading = coursesLoading || sessionsLoading || roomsLoading
+  const isError = coursesError || sessionsError || roomsError
+
+  const handleRefetch = () => {
+    refetchCourses()
+    refetchSessions()
+    refetchRooms()
+  }
 
   const isGenerating = generateSchedule.isPending
 
@@ -147,6 +158,32 @@ function GeneratePage() {
     courses: courses.length,
     sessions: sessions.length,
     rooms: rooms.length,
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 flex-col gap-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Create a Schedule</h1>
+            <p className="text-muted-foreground">Loading resources...</p>
+          </div>
+        </div>
+        <CardGridSkeleton cards={3} />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-1 flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Create a Schedule</h1>
+          <p className="text-muted-foreground">We'll find the best times and rooms for all your classes</p>
+        </div>
+        <ErrorState message="Failed to load resources" onRetry={handleRefetch} />
+      </div>
+    )
   }
 
   return (
