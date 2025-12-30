@@ -217,6 +217,61 @@ function SchedulePage() {
     return colors[color] || colors.blue
   }
 
+  // Calculate overlapping sessions and their positions
+  const getSessionsWithLayout = (daySessions: Session[]) => {
+    if (daySessions.length === 0) return []
+
+    // Sort by start time
+    const sorted = [...daySessions].sort((a, b) => a.startHour - b.startHour)
+
+    // Find overlapping groups and assign columns
+    const sessionLayouts: { session: Session; column: number; totalColumns: number }[] = []
+    const columns: { endHour: number; session: Session }[][] = []
+
+    for (const session of sorted) {
+      const sessionEnd = session.startHour + session.duration
+
+      // Find a column where this session fits (doesn't overlap)
+      let placed = false
+      for (let colIdx = 0; colIdx < columns.length; colIdx++) {
+        const column = columns[colIdx]
+        const lastInColumn = column[column.length - 1]
+        if (lastInColumn.endHour <= session.startHour) {
+          // Session fits in this column
+          column.push({ endHour: sessionEnd, session })
+          sessionLayouts.push({ session, column: colIdx, totalColumns: 0 })
+          placed = true
+          break
+        }
+      }
+
+      if (!placed) {
+        // Need a new column
+        columns.push([{ endHour: sessionEnd, session }])
+        sessionLayouts.push({ session, column: columns.length - 1, totalColumns: 0 })
+      }
+    }
+
+    // Now determine totalColumns for each session by finding overlapping sessions
+    for (const layout of sessionLayouts) {
+      const sessionStart = layout.session.startHour
+      const sessionEnd = layout.session.startHour + layout.session.duration
+
+      // Find all sessions that overlap with this one
+      const overlapping = sessionLayouts.filter(other => {
+        const otherStart = other.session.startHour
+        const otherEnd = other.session.startHour + other.session.duration
+        return sessionStart < otherEnd && sessionEnd > otherStart
+      })
+
+      // Get unique columns used by overlapping sessions
+      const usedColumns = new Set(overlapping.map(o => o.column))
+      layout.totalColumns = usedColumns.size
+    }
+
+    return sessionLayouts
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-6 animate-fade-in">
       {/* Header */}
@@ -373,39 +428,49 @@ function SchedulePage() {
                     </div>
 
                     {/* Day Columns */}
-                    {days.map((day) => (
-                      <div key={day} className="relative border-l" style={{ height: `${hours.length * 60}px` }}>
-                        {/* Hour lines */}
-                        {hours.map((hour) => (
-                          <div
-                            key={hour}
-                            className="absolute w-full border-b border-dashed border-muted/50"
-                            style={{ top: `${(hour - 8) * 60}px`, height: '60px' }}
-                          />
-                        ))}
+                    {days.map((day) => {
+                      const daySessions = sessions.filter((s) => s.day === day)
+                      const sessionsWithLayout = getSessionsWithLayout(daySessions)
 
-                        {/* Sessions */}
-                        {sessions
-                          .filter((s) => s.day === day)
-                          .map((session) => {
+                      return (
+                        <div key={day} className="relative border-l" style={{ height: `${hours.length * 60}px` }}>
+                          {/* Hour lines */}
+                          {hours.map((hour) => (
+                            <div
+                              key={hour}
+                              className="absolute w-full border-b border-dashed border-muted/50"
+                              style={{ top: `${(hour - 8) * 60}px`, height: '60px' }}
+                            />
+                          ))}
+
+                          {/* Sessions */}
+                          {sessionsWithLayout.map(({ session, column, totalColumns }) => {
                             const colors = getColorClasses(session.color)
+                            const width = totalColumns > 1 ? `calc(${100 / totalColumns}% - 8px)` : 'calc(100% - 8px)'
+                            const left = totalColumns > 1 ? `calc(${(column / totalColumns) * 100}% + 4px)` : '4px'
+
                             return (
                               <div
                                 key={session.id}
                                 onClick={() => setSelectedSession(session)}
-                                className={`absolute left-1 right-1 rounded-md border-l-4 px-2 py-1.5 cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${colors.bg} ${colors.border}`}
-                                style={getSessionStyle(session.startHour, session.duration)}
+                                className={`absolute rounded-md border-l-4 px-2 py-1.5 cursor-pointer transition-all hover:shadow-lg hover:z-10 ${colors.bg} ${colors.border}`}
+                                style={{
+                                  ...getSessionStyle(session.startHour, session.duration),
+                                  width,
+                                  left,
+                                }}
                               >
-                                <div className={`text-xs font-semibold ${colors.text}`}>{session.course}</div>
-                                <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                                  <DoorOpen className="size-3" />
-                                  {session.room}
+                                <div className={`text-xs font-semibold truncate ${colors.text}`}>{session.course}</div>
+                                <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5 truncate">
+                                  <DoorOpen className="size-3 shrink-0" />
+                                  <span className="truncate">{session.room}</span>
                                 </div>
                               </div>
                             )
                           })}
-                      </div>
-                    ))}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               </div>

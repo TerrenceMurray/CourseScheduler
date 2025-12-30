@@ -11,6 +11,9 @@ dependencies:
   '@radix-ui/react-checkbox':
     specifier: ^1.3.3
     version: 1.3.3(@types/react-dom@19.2.3)(@types/react@19.2.7)(react-dom@19.2.3)(react@19.2.3)
+  '@radix-ui/react-collapsible':
+    specifier: ^1.1.12
+    version: 1.1.12(@types/react-dom@19.2.3)(@types/react@19.2.7)(react-dom@19.2.3)(react@19.2.3)
   '@radix-ui/react-dialog':
     specifier: ^1.1.15
     version: 1.1.15(@types/react-dom@19.2.3)(@types/react@19.2.7)(react-dom@19.2.3)(react@19.2.3)
@@ -61,7 +64,7 @@ dependencies:
     version: 1.143.6(@tanstack/react-router@1.143.6)(@tanstack/router-core@1.143.6)(csstype@3.2.3)(react-dom@19.2.3)(react@19.2.3)(solid-js@1.9.10)
   '@tanstack/react-router-ssr-query':
     specifier: ^1.131.7
-    version: 1.143.6(@tanstack/query-core@5.90.12)(@tanstack/react-query@5.90.16)(@tanstack/react-router@1.143.6)(@tanstack/router-core@1.143.6)(react-dom@19.2.3)(react@19.2.3)
+    version: 1.143.6(@tanstack/query-core@5.90.16)(@tanstack/react-query@5.90.16)(@tanstack/react-router@1.143.6)(@tanstack/router-core@1.143.6)(react-dom@19.2.3)(react@19.2.3)
   '@tanstack/react-start':
     specifier: ^1.132.0
     version: 1.143.8(react-dom@19.2.3)(react@19.2.3)(vite@7.3.0)
@@ -1208,6 +1211,33 @@ packages:
       '@radix-ui/react-use-controllable-state': 1.2.2(@types/react@19.2.7)(react@19.2.3)
       '@radix-ui/react-use-previous': 1.1.1(@types/react@19.2.7)(react@19.2.3)
       '@radix-ui/react-use-size': 1.1.1(@types/react@19.2.7)(react@19.2.3)
+      '@types/react': 19.2.7
+      '@types/react-dom': 19.2.3(@types/react@19.2.7)
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+    dev: false
+
+  /@radix-ui/react-collapsible@1.1.12(@types/react-dom@19.2.3)(@types/react@19.2.7)(react-dom@19.2.3)(react@19.2.3):
+    resolution: {integrity: sha512-Uu+mSh4agx2ib1uIGPP4/CKNULyajb3p92LsVXmH2EHVMTfZWpll88XJ0j4W0z3f8NK1eYl1+Mf/szHPmcHzyA==}
+    peerDependencies:
+      '@types/react': '*'
+      '@types/react-dom': '*'
+      react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+      react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      '@types/react-dom':
+        optional: true
+    dependencies:
+      '@radix-ui/primitive': 1.1.3
+      '@radix-ui/react-compose-refs': 1.1.2(@types/react@19.2.7)(react@19.2.3)
+      '@radix-ui/react-context': 1.1.2(@types/react@19.2.7)(react@19.2.3)
+      '@radix-ui/react-id': 1.1.1(@types/react@19.2.7)(react@19.2.3)
+      '@radix-ui/react-presence': 1.1.5(@types/react-dom@19.2.3)(@types/react@19.2.7)(react-dom@19.2.3)(react@19.2.3)
+      '@radix-ui/react-primitive': 2.1.3(@types/react-dom@19.2.3)(@types/react@19.2.7)(react-dom@19.2.3)(react@19.2.3)
+      '@radix-ui/react-use-controllable-state': 1.2.2(@types/react@19.2.7)(react@19.2.3)
+      '@radix-ui/react-use-layout-effect': 1.1.1(@types/react@19.2.7)(react@19.2.3)
       '@types/react': 19.2.7
       '@types/react-dom': 19.2.3(@types/react@19.2.7)
       react: 19.2.3
@@ -2458,10 +2488,6 @@ packages:
     engines: {node: '>=12'}
     dev: false
 
-  /@tanstack/query-core@5.90.12:
-    resolution: {integrity: sha512-T1/8t5DhV/SisWjDnaiU2drl6ySvsHj1bHBCWNXd+/T+Hh1cf6JodyEYMd5sgwm+b/mETT4EV3H+zCVczCU5hg==}
-    dev: false
-
   /@tanstack/query-core@5.90.16:
     resolution: {integrity: sha512-MvtWckSVufs/ja463/K4PyJeqT+HMlJWtw6PrCpywznd2NSgO3m4KwO9RqbFqGg6iDE8vVMFWMeQI4Io3eEYww==}
     dev: false
@@ -2518,7 +2544,7 @@ packages:
       - solid-js
     dev: false
 
-  /@tanstack/react-router-ssr-query@1.143.6(@tanstack/query-core@5.90.12)(@tanstack/react-query@5.90.16)(@tanstack/react-router@1.143.6)(@tanstack/router-core@1.143.6)(react-dom@19.2.3)(react@19.2.3):
+  /@tanstack/react-router-ssr-query@1.143.6(@tanstack/query-core@5.90.16)(@tanstack/react-query@5.90.16)(@tanstack/react-router@1.143.6)(@tanstack/router-core@1.143.6)(react-dom@19.2.3)(react@19.2.3):
     resolution: {integrity: sha512-E0f9VkDOqgRD8re+rJjrZMIIYi7eVJns7Gr5q5OGGf8NDXn1warB05NqT6UewW+ywoXotNubeEHRRlvsBQL6wA==}
     engines: {node: '>=12'}
     peerDependencies:
@@ -2528,10 +2554,10 @@ packages:
       react: '>=18.0.0 || >=19.0.0'
       react-dom: '>=18.0.0 || >=19.0.0'
     dependencies:
-      '@tanstack/query-core': 5.90.12
+      '@tanstack/query-core': 5.90.16
       '@tanstack/react-query': 5.90.16(react@19.2.3)
       '@tanstack/react-router': 1.143.6(react-dom@19.2.3)(react@19.2.3)
-      '@tanstack/router-ssr-query-core': 1.143.6(@tanstack/query-core@5.90.12)(@tanstack/router-core@1.143.6)
+      '@tanstack/router-ssr-query-core': 1.143.6(@tanstack/query-core@5.90.16)(@tanstack/router-core@1.143.6)
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
     transitivePeerDependencies:
@@ -2717,14 +2743,14 @@ packages:
       - supports-color
     dev: false
 
-  /@tanstack/router-ssr-query-core@1.143.6(@tanstack/query-core@5.90.12)(@tanstack/router-core@1.143.6):
+  /@tanstack/router-ssr-query-core@1.143.6(@tanstack/query-core@5.90.16)(@tanstack/router-core@1.143.6):
     resolution: {integrity: sha512-dVqEihMg5mkR0MxnhWkepQsmBLHNhnU3SBHBpwVA4NCo9awzynmkkFE3HH5vE9ZBX/pU5YrGxQZQnc4jDUK9Ig==}
     engines: {node: '>=12'}
     peerDependencies:
       '@tanstack/query-core': '>=5.90.0'
       '@tanstack/router-core': '>=1.127.0'
     dependencies:
-      '@tanstack/query-core': 5.90.12
+      '@tanstack/query-core': 5.90.16
       '@tanstack/router-core': 1.143.6
     dev: false
 
