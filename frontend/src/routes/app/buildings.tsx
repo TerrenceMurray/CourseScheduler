@@ -18,8 +18,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { CreateBuildingModal } from '@/components/modals'
-import { useBuildings, useCreateBuilding, useDeleteBuilding } from '@/hooks'
+import { CreateBuildingModal, EditBuildingModal } from '@/components/modals'
+import { useBuildings, useCreateBuilding, useUpdateBuilding, useDeleteBuilding } from '@/hooks'
+import type { Building } from '@/types/api'
 import { useRooms } from '@/hooks'
 import { CardListSkeleton } from '@/components/loading-skeleton'
 import { ErrorState } from '@/components/error-state'
@@ -30,10 +31,13 @@ export const Route = createFileRoute('/app/buildings')({
 
 function BuildingsPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingBuilding, setEditingBuilding] = useState<Building | null>(null)
 
   const { data: buildings = [], isLoading, isError, refetch } = useBuildings()
   const { data: rooms = [] } = useRooms()
   const createBuilding = useCreateBuilding()
+  const updateBuilding = useUpdateBuilding()
   const deleteBuilding = useDeleteBuilding()
 
   // Calculate room counts per building
@@ -65,6 +69,19 @@ function BuildingsPage() {
 
   const handleDelete = (id: string) => {
     deleteBuilding.mutate(id)
+  }
+
+  const handleEdit = (building: Building) => {
+    setEditingBuilding(building)
+    setEditModalOpen(true)
+  }
+
+  const handleUpdate = (data: { name: string }) => {
+    if (!editingBuilding) return
+    updateBuilding.mutate(
+      { id: editingBuilding.id, data },
+      { onSuccess: () => setEditModalOpen(false) }
+    )
   }
 
   // Color assignment based on building index
@@ -131,6 +148,14 @@ function BuildingsPage() {
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
         onSubmit={handleCreate}
+      />
+
+      <EditBuildingModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        onSubmit={handleUpdate}
+        building={editingBuilding}
+        isLoading={updateBuilding.isPending}
       />
 
       {/* Summary Stats */}
@@ -208,7 +233,7 @@ function BuildingsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(building)}>
                           <Pencil className="mr-2 size-4" />
                           Edit
                         </DropdownMenuItem>

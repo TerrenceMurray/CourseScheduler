@@ -19,8 +19,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
-import { CreateRoomTypeModal } from '@/components/modals'
-import { useRoomTypes, useCreateRoomType, useDeleteRoomType } from '@/hooks'
+import { CreateRoomTypeModal, EditRoomTypeModal } from '@/components/modals'
+import { useRoomTypes, useCreateRoomType, useUpdateRoomType, useDeleteRoomType } from '@/hooks'
+import type { RoomType } from '@/types/api'
 import { useRooms } from '@/hooks'
 import { CardListSkeleton } from '@/components/loading-skeleton'
 import { ErrorState } from '@/components/error-state'
@@ -31,10 +32,13 @@ export const Route = createFileRoute('/app/room-types')({
 
 function RoomTypesPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingRoomType, setEditingRoomType] = useState<RoomType | null>(null)
 
   const { data: roomTypes = [], isLoading, isError, refetch } = useRoomTypes()
   const { data: rooms = [] } = useRooms()
   const createRoomType = useCreateRoomType()
+  const updateRoomType = useUpdateRoomType()
   const deleteRoomType = useDeleteRoomType()
 
   // Calculate room counts per type
@@ -70,6 +74,19 @@ function RoomTypesPage() {
 
   const handleDelete = (name: string) => {
     deleteRoomType.mutate(name)
+  }
+
+  const handleEdit = (roomType: RoomType) => {
+    setEditingRoomType(roomType)
+    setEditModalOpen(true)
+  }
+
+  const handleUpdate = (data: { name: string }) => {
+    if (!editingRoomType) return
+    updateRoomType.mutate(
+      { name: editingRoomType.name, data },
+      { onSuccess: () => setEditModalOpen(false) }
+    )
   }
 
   // Color assignment based on index
@@ -132,6 +149,14 @@ function RoomTypesPage() {
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
         onSubmit={handleCreate}
+      />
+
+      <EditRoomTypeModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        onSubmit={handleUpdate}
+        roomType={editingRoomType}
+        isLoading={updateRoomType.isPending}
       />
 
       {/* Summary Stats */}
@@ -205,7 +230,7 @@ function RoomTypesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(type)}>
                           <Pencil className="mr-2 size-4" />
                           Edit
                         </DropdownMenuItem>

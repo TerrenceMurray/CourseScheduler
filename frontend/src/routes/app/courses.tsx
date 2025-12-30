@@ -1,97 +1,114 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useState, useMemo } from 'react'
-import {
-  Plus,
-  Search,
-  MoreHorizontal,
-  BookOpen,
-  Clock,
-  FlaskConical,
-  GraduationCap,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Trash2,
-  X,
-  Check,
-  ChevronDown,
-  ChevronRight,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
-import { CountUp } from '@/components/count-up'
-import { CreateCourseModal, AddSessionModal } from '@/components/modals'
-import type { SessionFormData } from '@/components/modals'
-import { useCourses, useCreateCourse, useDeleteCourse } from '@/hooks'
-import { useSessions, useCreateSession, useDeleteSession } from '@/hooks'
-import { useRoomTypes } from '@/hooks'
-import { TableSkeleton } from '@/components/loading-skeleton'
-import { ErrorState } from '@/components/error-state'
-import type { SessionType, CourseSession } from '@/types/api'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
+import { createFileRoute } from '@tanstack/react-router';
+import { useState, useMemo } from 'react';
+import
+  {
+    Plus,
+    Search,
+    MoreHorizontal,
+    BookOpen,
+    Clock,
+    FlaskConical,
+    GraduationCap,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
+    Trash2,
+    X,
+    Check,
+    ChevronDown,
+    ChevronRight,
+    Pencil,
+  } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import
+  {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+  } from '@/components/ui/table';
+import
+  {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+  } from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { CountUp } from '@/components/count-up';
+import { CreateCourseModal, AddSessionModal, EditCourseModal, EditSessionModal } from '@/components/modals';
+import type { SessionFormData } from '@/components/modals';
+import { useCourses, useCreateCourse, useUpdateCourse, useDeleteCourse } from '@/hooks';
+import { useSessions, useCreateSession, useUpdateSession, useDeleteSession } from '@/hooks';
+import type { Course } from '@/types/api';
+import { useRoomTypes } from '@/hooks';
+import { TableSkeleton } from '@/components/loading-skeleton';
+import { ErrorState } from '@/components/error-state';
+import type { SessionType, CourseSession } from '@/types/api';
+import
+  {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+  } from '@/components/ui/collapsible';
 
 export const Route = createFileRoute('/app/courses')({
   component: CoursesPage,
-})
+});
 
-type SortField = 'name' | 'sessions' | 'totalHours'
-type SortDirection = 'asc' | 'desc'
+type SortField = 'name' | 'sessions' | 'totalHours';
+type SortDirection = 'asc' | 'desc';
 
-interface EnrichedCourse {
-  id: string
-  name: string
-  sessions: number
-  totalHours: number
-  sessionDetails: CourseSession[]
+interface EnrichedCourse
+{
+  id: string;
+  name: string;
+  sessions: number;
+  totalHours: number;
+  sessionDetails: CourseSession[];
 }
 
-function CoursesPage() {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [sortField, setSortField] = useState<SortField>('name')
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
-  const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [addSessionModalOpen, setAddSessionModalOpen] = useState(false)
-  const [selectedCourse, setSelectedCourse] = useState<EnrichedCourse | null>(null)
-  const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set())
+function CoursesPage ()
+{
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [addSessionModalOpen, setAddSessionModalOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState<EnrichedCourse | null>(null);
+  const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
+  const [editCourseModalOpen, setEditCourseModalOpen] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [editSessionModalOpen, setEditSessionModalOpen] = useState(false);
+  const [editingSession, setEditingSession] = useState<CourseSession | null>(null);
+  const [editingSessionCourseName, setEditingSessionCourseName] = useState('');
 
-  const { data: allCourses = [], isLoading, isError, refetch } = useCourses()
-  const { data: allSessions = [] } = useSessions()
-  const { data: roomTypes = [] } = useRoomTypes()
-  const createCourse = useCreateCourse()
-  const createSession = useCreateSession()
-  const deleteCourse = useDeleteCourse()
-  const deleteSession = useDeleteSession()
+  const { data: allCourses = [], isLoading, isError, refetch } = useCourses();
+  const { data: allSessions = [] } = useSessions();
+  const { data: roomTypes = [] } = useRoomTypes();
+  const createCourse = useCreateCourse();
+  const updateCourse = useUpdateCourse();
+  const createSession = useCreateSession();
+  const updateSession = useUpdateSession();
+  const deleteCourse = useDeleteCourse();
+  const deleteSession = useDeleteSession();
 
-  const roomTypeNames = roomTypes.map(rt => rt.name)
+  const roomTypeNames = roomTypes.map(rt => rt.name);
 
-  const enrichedCourses = useMemo(() => {
-    return allCourses.map(course => {
-      const courseSessions = allSessions.filter(s => s.course_id === course.id)
-      const totalSessions = courseSessions.reduce((sum, s) => sum + s.number_of_sessions, 0)
-      const totalMinutes = courseSessions.reduce((sum, s) => sum + (s.duration * s.number_of_sessions), 0)
+  const enrichedCourses = useMemo(() =>
+  {
+    return allCourses.map(course =>
+    {
+      const courseSessions = allSessions.filter(s => s.course_id === course.id);
+      const totalSessions = courseSessions.reduce((sum, s) => sum + s.number_of_sessions, 0);
+      const totalMinutes = courseSessions.reduce((sum, s) => sum + (s.duration * s.number_of_sessions), 0);
 
       return {
         id: course.id,
@@ -99,94 +116,114 @@ function CoursesPage() {
         sessions: totalSessions,
         totalHours: Math.round(totalMinutes / 60 * 10) / 10,
         sessionDetails: courseSessions,
-      }
-    })
-  }, [allCourses, allSessions])
+      };
+    });
+  }, [allCourses, allSessions]);
 
-  const courses = useMemo(() => {
-    let filtered = enrichedCourses
+  const courses = useMemo(() =>
+  {
+    let filtered = enrichedCourses;
 
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(c => c.name.toLowerCase().includes(query))
+    if (searchQuery)
+    {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(c => c.name.toLowerCase().includes(query));
     }
 
-    filtered.sort((a, b) => {
-      let comparison = 0
-      switch (sortField) {
+    filtered.sort((a, b) =>
+    {
+      let comparison = 0;
+      switch (sortField)
+      {
         case 'name':
-          comparison = a.name.localeCompare(b.name)
-          break
+          comparison = a.name.localeCompare(b.name);
+          break;
         case 'sessions':
-          comparison = a.sessions - b.sessions
-          break
+          comparison = a.sessions - b.sessions;
+          break;
         case 'totalHours':
-          comparison = a.totalHours - b.totalHours
-          break
+          comparison = a.totalHours - b.totalHours;
+          break;
       }
-      return sortDirection === 'asc' ? comparison : -comparison
-    })
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
 
-    return filtered
-  }, [enrichedCourses, searchQuery, sortField, sortDirection])
+    return filtered;
+  }, [enrichedCourses, searchQuery, sortField, sortDirection]);
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortField(field)
-      setSortDirection('asc')
+  const handleSort = (field: SortField) =>
+  {
+    if (sortField === field)
+    {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else
+    {
+      setSortField(field);
+      setSortDirection('asc');
     }
-  }
+  };
 
-  const toggleSelectAll = () => {
-    if (selectedIds.size === courses.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(courses.map(c => c.id)))
+  const toggleSelectAll = () =>
+  {
+    if (selectedIds.size === courses.length)
+    {
+      setSelectedIds(new Set());
+    } else
+    {
+      setSelectedIds(new Set(courses.map(c => c.id)));
     }
-  }
+  };
 
-  const toggleSelect = (id: string) => {
-    const newSelected = new Set(selectedIds)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
+  const toggleSelect = (id: string) =>
+  {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id))
+    {
+      newSelected.delete(id);
+    } else
+    {
+      newSelected.add(id);
     }
-    setSelectedIds(newSelected)
-  }
+    setSelectedIds(newSelected);
+  };
 
-  const clearSelection = () => setSelectedIds(new Set())
+  const clearSelection = () => setSelectedIds(new Set());
 
-  const handleBulkDelete = () => {
-    selectedIds.forEach(id => deleteCourse.mutate(id))
-    clearSelection()
-  }
+  const handleBulkDelete = () =>
+  {
+    selectedIds.forEach(id => deleteCourse.mutate(id));
+    clearSelection();
+  };
 
-  const toggleExpanded = (id: string) => {
-    const newExpanded = new Set(expandedCourses)
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id)
-    } else {
-      newExpanded.add(id)
+  const toggleExpanded = (id: string) =>
+  {
+    const newExpanded = new Set(expandedCourses);
+    if (newExpanded.has(id))
+    {
+      newExpanded.delete(id);
+    } else
+    {
+      newExpanded.add(id);
     }
-    setExpandedCourses(newExpanded)
-  }
+    setExpandedCourses(newExpanded);
+  };
 
-  const handleCreateCourse = (data: { name: string }) => {
+  const handleCreateCourse = (data: { name: string; }) =>
+  {
     createCourse.mutate(
       { name: data.name },
       {
-        onSuccess: () => {
-          setCreateModalOpen(false)
+        onSuccess: () =>
+        {
+          setCreateModalOpen(false);
         },
       }
-    )
-  }
+    );
+  };
 
-  const handleAddSession = (data: SessionFormData) => {
-    if (!selectedCourse) return
+  const handleAddSession = (data: SessionFormData) =>
+  {
+    if (!selectedCourse) return;
     createSession.mutate(
       {
         course_id: selectedCourse.id,
@@ -196,43 +233,90 @@ function CoursesPage() {
         number_of_sessions: data.sessions,
       },
       {
-        onSuccess: () => {
-          setAddSessionModalOpen(false)
-          setSelectedCourse(null)
-          setExpandedCourses(prev => new Set([...prev, selectedCourse.id]))
+        onSuccess: () =>
+        {
+          setAddSessionModalOpen(false);
+          setSelectedCourse(null);
+          setExpandedCourses(prev => new Set([...prev, selectedCourse.id]));
         },
       }
-    )
-  }
+    );
+  };
 
-  const handleDeleteSession = (sessionId: string) => {
-    deleteSession.mutate(sessionId)
-  }
+  const handleDeleteSession = (sessionId: string) =>
+  {
+    deleteSession.mutate(sessionId);
+  };
 
-  const handleDeleteCourse = (id: string) => {
-    deleteCourse.mutate(id)
-  }
+  const handleDeleteCourse = (id: string) =>
+  {
+    deleteCourse.mutate(id);
+  };
 
-  const openAddSessionModal = (course: EnrichedCourse) => {
-    setSelectedCourse(course)
-    setAddSessionModalOpen(true)
-  }
+  const openAddSessionModal = (course: EnrichedCourse) =>
+  {
+    setSelectedCourse(course);
+    setAddSessionModalOpen(true);
+  };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ArrowUpDown className="ml-1 size-3" />
-    return sortDirection === 'asc' ? <ArrowUp className="ml-1 size-3" /> : <ArrowDown className="ml-1 size-3" />
-  }
+  const handleEditCourse = (course: EnrichedCourse) =>
+  {
+    setEditingCourse({ id: course.id, name: course.name });
+    setEditCourseModalOpen(true);
+  };
+
+  const handleUpdateCourse = (data: { name: string }) =>
+  {
+    if (!editingCourse) return;
+    updateCourse.mutate(
+      { id: editingCourse.id, data },
+      { onSuccess: () => setEditCourseModalOpen(false) }
+    );
+  };
+
+  const handleEditSession = (session: CourseSession, courseName: string) =>
+  {
+    setEditingSession(session);
+    setEditingSessionCourseName(courseName);
+    setEditSessionModalOpen(true);
+  };
+
+  const handleUpdateSession = (data: SessionFormData) =>
+  {
+    if (!editingSession) return;
+    updateSession.mutate(
+      {
+        id: editingSession.id,
+        data: {
+          type: data.type,
+          required_room: data.requiredRoom,
+          duration: Math.round(data.sessionDuration * 60),
+          number_of_sessions: data.sessions,
+        },
+      },
+      { onSuccess: () => setEditSessionModalOpen(false) }
+    );
+  };
+
+  const SortIcon = ({ field }: { field: SortField; }) =>
+  {
+    if (sortField !== field) return <ArrowUpDown className="ml-1 size-3" />;
+    return sortDirection === 'asc' ? <ArrowUp className="ml-1 size-3" /> : <ArrowDown className="ml-1 size-3" />;
+  };
 
   // Count session types across all courses
-  const sessionTypeCounts = useMemo(() => {
-    const counts = { lecture: 0, lab: 0, tutorial: 0 }
-    allSessions.forEach(s => {
-      if (s.type in counts) {
-        counts[s.type as keyof typeof counts]++
+  const sessionTypeCounts = useMemo(() =>
+  {
+    const counts = { lecture: 0, lab: 0, tutorial: 0 };
+    allSessions.forEach(s =>
+    {
+      if (s.type in counts)
+      {
+        counts[s.type as keyof typeof counts]++;
       }
-    })
-    return counts
-  }, [allSessions])
+    });
+    return counts;
+  }, [allSessions]);
 
   const stats = [
     {
@@ -267,33 +351,38 @@ function CoursesPage() {
       iconBg: 'bg-amber-500/10',
       iconColor: 'text-amber-500',
     },
-  ]
+  ];
 
-  const getTypeStyles = (type: string) => {
-    switch (type) {
+  const getTypeStyles = (type: string) =>
+  {
+    switch (type)
+    {
       case 'lab':
-        return { bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20' }
+        return { bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20' };
       case 'lecture':
-        return { bg: 'bg-blue-500/10', text: 'text-blue-500', border: 'border-blue-500/20' }
+        return { bg: 'bg-blue-500/10', text: 'text-blue-500', border: 'border-blue-500/20' };
       case 'tutorial':
-        return { bg: 'bg-emerald-500/10', text: 'text-emerald-500', border: 'border-emerald-500/20' }
+        return { bg: 'bg-emerald-500/10', text: 'text-emerald-500', border: 'border-emerald-500/20' };
       default:
-        return { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-muted' }
+        return { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-muted' };
     }
-  }
+  };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
+  const getTypeIcon = (type: string) =>
+  {
+    switch (type)
+    {
       case 'lab':
-        return FlaskConical
+        return FlaskConical;
       case 'tutorial':
-        return GraduationCap
+        return GraduationCap;
       default:
-        return BookOpen
+        return BookOpen;
     }
-  }
+  };
 
-  if (isLoading) {
+  if (isLoading)
+  {
     return (
       <div className="flex flex-1 flex-col gap-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -311,10 +400,11 @@ function CoursesPage() {
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
-  if (isError) {
+  if (isError)
+  {
     return (
       <div className="flex flex-1 flex-col gap-6">
         <div>
@@ -323,7 +413,7 @@ function CoursesPage() {
         </div>
         <ErrorState message="Failed to load courses" onRetry={() => refetch()} />
       </div>
-    )
+    );
   }
 
   return (
@@ -351,14 +441,33 @@ function CoursesPage() {
 
       <AddSessionModal
         open={addSessionModalOpen}
-        onOpenChange={(open) => {
-          setAddSessionModalOpen(open)
-          if (!open) setSelectedCourse(null)
+        onOpenChange={(open) =>
+        {
+          setAddSessionModalOpen(open);
+          if (!open) setSelectedCourse(null);
         }}
         onSubmit={handleAddSession}
         courseName={selectedCourse?.name}
         roomTypes={roomTypeNames}
         isLoading={createSession.isPending}
+      />
+
+      <EditCourseModal
+        open={editCourseModalOpen}
+        onOpenChange={setEditCourseModalOpen}
+        onSubmit={handleUpdateCourse}
+        course={editingCourse}
+        isLoading={updateCourse.isPending}
+      />
+
+      <EditSessionModal
+        open={editSessionModalOpen}
+        onOpenChange={setEditSessionModalOpen}
+        onSubmit={handleUpdateSession}
+        session={editingSession}
+        courseName={editingSessionCourseName}
+        roomTypes={roomTypeNames}
+        isLoading={updateSession.isPending}
       />
 
       {/* Stats Grid */}
@@ -491,11 +600,12 @@ function CoursesPage() {
                     )}
                   </TableCell>
                 </TableRow>
-              ) : courses.map((course) => {
-                const isExpanded = expandedCourses.has(course.id)
-                const hasLab = course.sessionDetails.some(s => s.type === 'lab')
-                const hasLecture = course.sessionDetails.some(s => s.type === 'lecture')
-                const hasTutorial = course.sessionDetails.some(s => s.type === 'tutorial')
+              ) : courses.map((course) =>
+              {
+                const isExpanded = expandedCourses.has(course.id);
+                const hasLab = course.sessionDetails.some(s => s.type === 'lab');
+                const hasLecture = course.sessionDetails.some(s => s.type === 'lecture');
+                const hasTutorial = course.sessionDetails.some(s => s.type === 'tutorial');
 
                 return (
                   <Collapsible key={course.id} asChild open={isExpanded} onOpenChange={() => toggleExpanded(course.id)}>
@@ -578,6 +688,10 @@ function CoursesPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditCourse(course)}>
+                                <Pencil className="mr-2 size-4" />
+                                Edit Course
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => openAddSessionModal(course)}>
                                 <Plus className="mr-2 size-4" />
                                 Add Session
@@ -626,9 +740,10 @@ function CoursesPage() {
                                 </div>
                               ) : (
                                 <div className="grid gap-2">
-                                  {course.sessionDetails.map((session) => {
-                                    const sessionTypeStyles = getTypeStyles(session.type)
-                                    const SessionIcon = getTypeIcon(session.type)
+                                  {course.sessionDetails.map((session) =>
+                                  {
+                                    const sessionTypeStyles = getTypeStyles(session.type);
+                                    const SessionIcon = getTypeIcon(session.type);
                                     return (
                                       <div
                                         key={session.id}
@@ -657,6 +772,14 @@ function CoursesPage() {
                                           <Button
                                             variant="ghost"
                                             size="icon"
+                                            className="size-8 text-muted-foreground hover:text-foreground"
+                                            onClick={() => handleEditSession(session, course.name)}
+                                          >
+                                            <Pencil className="size-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
                                             className="size-8 text-muted-foreground hover:text-destructive"
                                             onClick={() => handleDeleteSession(session.id)}
                                           >
@@ -664,7 +787,7 @@ function CoursesPage() {
                                           </Button>
                                         </div>
                                       </div>
-                                    )
+                                    );
                                   })}
                                 </div>
                               )}
@@ -674,12 +797,12 @@ function CoursesPage() {
                       </CollapsibleContent>
                     </>
                   </Collapsible>
-                )
+                );
               })}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

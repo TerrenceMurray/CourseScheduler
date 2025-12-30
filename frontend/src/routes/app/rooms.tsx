@@ -41,8 +41,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { CountUp } from '@/components/count-up'
-import { CreateRoomModal } from '@/components/modals'
-import { useRooms, useCreateRoom, useDeleteRoom } from '@/hooks'
+import { CreateRoomModal, EditRoomModal } from '@/components/modals'
+import { useRooms, useCreateRoom, useUpdateRoom, useDeleteRoom } from '@/hooks'
+import type { Room } from '@/types/api'
 import { useBuildings } from '@/hooks'
 import { useRoomTypes } from '@/hooks'
 import { CardListSkeleton } from '@/components/loading-skeleton'
@@ -58,11 +59,14 @@ function RoomsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [buildingFilter, setBuildingFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null)
 
   const { data: rooms = [], isLoading, isError, refetch } = useRooms()
   const { data: buildings = [] } = useBuildings()
   const { data: roomTypes = [] } = useRoomTypes()
   const createRoom = useCreateRoom()
+  const updateRoom = useUpdateRoom()
   const deleteRoom = useDeleteRoom()
 
   // Create lookup maps
@@ -115,6 +119,27 @@ function RoomsPage() {
 
   const handleDelete = (id: string) => {
     deleteRoom.mutate(id)
+  }
+
+  const handleEdit = (room: Room) => {
+    setEditingRoom(room)
+    setEditModalOpen(true)
+  }
+
+  const handleUpdate = (data: { name: string; building_id: string; type: string; capacity: number }) => {
+    if (!editingRoom) return
+    updateRoom.mutate(
+      {
+        id: editingRoom.id,
+        data: {
+          name: data.name,
+          building: data.building_id,
+          type: data.type,
+          capacity: data.capacity,
+        },
+      },
+      { onSuccess: () => setEditModalOpen(false) }
+    )
   }
 
   const stats = [
@@ -223,6 +248,16 @@ function RoomsPage() {
         onSubmit={handleCreate}
         buildings={buildings.map(b => b.name)}
         roomTypes={roomTypes.map(rt => rt.name)}
+      />
+
+      <EditRoomModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        onSubmit={handleUpdate}
+        room={editingRoom}
+        buildings={buildings}
+        roomTypes={roomTypes.map(rt => rt.name)}
+        isLoading={updateRoom.isPending}
       />
 
       {/* Stats Grid */}
@@ -355,7 +390,7 @@ function RoomsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEdit(room)}>
                               <Pencil className="mr-2 size-4" />
                               Edit
                             </DropdownMenuItem>
@@ -442,7 +477,7 @@ function RoomsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEdit(room)}>
                               <Pencil className="mr-2 size-4" />
                               Edit
                             </DropdownMenuItem>
