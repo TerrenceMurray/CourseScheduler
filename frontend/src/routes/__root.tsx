@@ -1,6 +1,16 @@
 import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from '@/components/ui/sonner'
 import { ThemeProvider } from '@/components/theme-provider'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+    },
+  },
+})
 
 import appCss from '../styles.css?url'
 
@@ -43,9 +53,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         />
       </head>
       <body className="h-full overflow-hidden">
-        <ThemeProvider defaultTheme="system">
-          {children}
-        </ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider defaultTheme="system">
+            {children}
+          </ThemeProvider>
+        </QueryClientProvider>
         <Scripts />
       </body>
     </html>
