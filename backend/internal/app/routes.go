@@ -4,6 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/TerrenceMurray/course-scheduler/internal/handlers"
+	"github.com/TerrenceMurray/course-scheduler/internal/middleware"
 )
 
 // setupRoutes registers all routes on the router
@@ -18,65 +19,71 @@ func (a *App) setupRoutes() {
 	schedulerHandler := handlers.NewSchedulerHandler(a.SchedulerService)
 
 	a.Router.Route("/api/v1", func(r chi.Router) {
-		// Buildings
-		r.Route("/buildings", func(r chi.Router) {
-			r.Get("/", buildingHandler.List)
-			r.Post("/", buildingHandler.Create)
-			r.Get("/{id}", buildingHandler.GetByID)
-			r.Put("/{id}", buildingHandler.Update)
-			r.Delete("/{id}", buildingHandler.Delete)
-		})
 
-		// Courses
-		r.Route("/courses", func(r chi.Router) {
-			r.Get("/", courseHandler.List)
-			r.Post("/", courseHandler.Create)
-			r.Get("/{id}", courseHandler.GetByID)
-			r.Put("/{id}", courseHandler.Update)
-			r.Delete("/{id}", courseHandler.Delete)
-			r.Get("/{id}/sessions", courseSessionHandler.GetByCourseID)
-		})
+		// Protected Routes
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(a.Config.JWTSecretKey))
 
-		// Course Sessions
-		r.Route("/sessions", func(r chi.Router) {
-			r.Get("/", courseSessionHandler.List)
-			r.Post("/", courseSessionHandler.Create)
-			r.Get("/{id}", courseSessionHandler.GetByID)
-			r.Put("/{id}", courseSessionHandler.Update)
-			r.Delete("/{id}", courseSessionHandler.Delete)
-		})
+			// Buildings
+			r.Route("/buildings", func(r chi.Router) {
+				r.Get("/", buildingHandler.List)
+				r.Post("/", buildingHandler.Create)
+				r.Get("/{id}", buildingHandler.GetByID)
+				r.Put("/{id}", buildingHandler.Update)
+				r.Delete("/{id}", buildingHandler.Delete)
+			})
 
-		// Rooms
-		r.Route("/rooms", func(r chi.Router) {
-			r.Get("/", roomHandler.List)
-			r.Post("/", roomHandler.Create)
-			r.Get("/{id}", roomHandler.GetByID)
-			r.Put("/{id}", roomHandler.Update)
-			r.Delete("/{id}", roomHandler.Delete)
-		})
+			// Courses
+			r.Route("/courses", func(r chi.Router) {
+				r.Get("/", courseHandler.List)
+				r.Post("/", courseHandler.Create)
+				r.Get("/{id}", courseHandler.GetByID)
+				r.Put("/{id}", courseHandler.Update)
+				r.Delete("/{id}", courseHandler.Delete)
+				r.Get("/{id}/sessions", courseSessionHandler.GetByCourseID)
+			})
 
-		// Room Types
-		r.Route("/room-types", func(r chi.Router) {
-			r.Get("/", roomTypeHandler.List)
-			r.Post("/", roomTypeHandler.Create)
-			r.Get("/{name}", roomTypeHandler.GetByName)
-			r.Put("/{name}", roomTypeHandler.Update)
-			r.Delete("/{name}", roomTypeHandler.Delete)
-		})
+			// Course Sessions
+			r.Route("/sessions", func(r chi.Router) {
+				r.Get("/", courseSessionHandler.List)
+				r.Post("/", courseSessionHandler.Create)
+				r.Get("/{id}", courseSessionHandler.GetByID)
+				r.Put("/{id}", courseSessionHandler.Update)
+				r.Delete("/{id}", courseSessionHandler.Delete)
+			})
 
-		// Schedules
-		r.Route("/schedules", func(r chi.Router) {
-			r.Get("/", scheduleHandler.List)
-			r.Post("/", scheduleHandler.Create)
-			r.Get("/{id}", scheduleHandler.GetByID)
-			r.Put("/{id}", scheduleHandler.Update)
-			r.Delete("/{id}", scheduleHandler.Delete)
-		})
+			// Rooms
+			r.Route("/rooms", func(r chi.Router) {
+				r.Get("/", roomHandler.List)
+				r.Post("/", roomHandler.Create)
+				r.Get("/{id}", roomHandler.GetByID)
+				r.Put("/{id}", roomHandler.Update)
+				r.Delete("/{id}", roomHandler.Delete)
+			})
 
-		// Scheduler
-		r.Route("/scheduler", func(r chi.Router) {
-			r.Post("/generate", schedulerHandler.Generate)
-			r.Post("/generate-and-save", schedulerHandler.GenerateAndSave)
+			// Room Types
+			r.Route("/room-types", func(r chi.Router) {
+				r.Get("/", roomTypeHandler.List)
+				r.Post("/", roomTypeHandler.Create)
+				r.Get("/{name}", roomTypeHandler.GetByName)
+				r.Put("/{name}", roomTypeHandler.Update)
+				r.Delete("/{name}", roomTypeHandler.Delete)
+			})
+
+			// Schedules
+			r.Route("/schedules", func(r chi.Router) {
+				r.Get("/", scheduleHandler.List)
+				r.Post("/", scheduleHandler.Create)
+				r.Get("/{id}", scheduleHandler.GetByID)
+				r.Put("/{id}", scheduleHandler.Update)
+				r.Delete("/{id}", scheduleHandler.Delete)
+			})
+
+			// Scheduler
+			r.Route("/scheduler", func(r chi.Router) {
+				r.Post("/generate", schedulerHandler.Generate)
+				r.Post("/generate-and-save", schedulerHandler.GenerateAndSave)
+			})
 		})
 	})
 }
