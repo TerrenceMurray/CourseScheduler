@@ -11,3 +11,6 @@ export { EditBuildingModal } from './edit-building-modal'
 export { EditRoomModal } from './edit-room-modal'
 export { EditRoomTypeModal } from './edit-room-type-modal'
 export { EditSessionModal } from './edit-session-modal'
+
+// Other modals
+export { WelcomeModal } from './welcome-modal'

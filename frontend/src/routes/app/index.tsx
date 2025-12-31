@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   BookOpen,
   DoorOpen,
@@ -33,6 +33,7 @@ import { SetupWizard } from '@/components/setup-wizard'
 import { useCourses, useRooms, useBuildings, useRoomTypes, useSchedules } from '@/hooks'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorState } from '@/components/error-state'
+import { WelcomeModal } from '@/components/modals'
 
 export const Route = createFileRoute('/app/')({
   component: Dashboard,
@@ -45,8 +46,27 @@ function getGreeting() {
   return 'Good evening'
 }
 
+const WELCOME_DISMISSED_KEY = 'course-scheduler-welcome-dismissed'
+
 function Dashboard() {
   const [showTip, setShowTip] = useState(true)
+  const [showWelcome, setShowWelcome] = useState(false)
+
+  // Check if welcome modal should be shown (first visit)
+  useEffect(() => {
+    const dismissed = localStorage.getItem(WELCOME_DISMISSED_KEY)
+    if (!dismissed) {
+      setShowWelcome(true)
+    }
+  }, [])
+
+  // Handle welcome modal dismissal
+  const handleWelcomeClose = (open: boolean) => {
+    if (!open) {
+      localStorage.setItem(WELCOME_DISMISSED_KEY, 'true')
+      setShowWelcome(false)
+    }
+  }
 
   const { data: courses = [], isLoading: coursesLoading, isError: coursesError, refetch: refetchCourses } = useCourses()
   const { data: rooms = [], isLoading: roomsLoading, isError: roomsError, refetch: refetchRooms } = useRooms()
@@ -766,6 +786,9 @@ function Dashboard() {
           </Card>
         </Link>
       </div>
+
+      {/* Welcome Modal - Shows on first visit */}
+      <WelcomeModal open={showWelcome} onOpenChange={handleWelcomeClose} />
     </div>
   )
 }
