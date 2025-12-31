@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   User,
   Moon,
@@ -13,6 +13,8 @@ import {
   Calendar,
   Palette,
   Save,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,8 +27,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useTheme } from '@/components/theme-provider'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/contexts/auth-context'
+import { supabase } from '@/lib/supabase'
+import { toast } from 'sonner'
 
 export const Route = createFileRoute('/app/settings')({
   component: SettingsPage,
@@ -38,30 +44,122 @@ const sections = [
   { id: 'security', label: 'Security', icon: Shield },
 ]
 
+const PREFERENCES_KEY = 'course-scheduler-preferences'
+
 function SettingsPage() {
   const { theme, setTheme } = useTheme()
+  const { user } = useAuth()
   const [activeSection, setActiveSection] = useState('profile')
-  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Password change state
+  const [passwords, setPasswords] = useState({
+    current: '',
+    new: '',
+    confirm: '',
+  })
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [changingPassword, setChangingPassword] = useState(false)
+
+  // Get user profile from Supabase auth
+  const userEmail = user?.email ?? ''
+  const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || ''
+  const userRole = user?.user_metadata?.role || 'User'
 
   const [profile, setProfile] = useState({
-    name: 'Dr. Sarah Johnson',
-    email: 'sarah.johnson@university.edu',
-    role: 'Department Administrator',
-    department: 'Computer Science',
+    name: userName,
+    department: user?.user_metadata?.department || '',
   })
 
-  const [preferences, setPreferences] = useState({
-    language: 'en',
-    timezone: 'America/New_York',
-    dateFormat: 'MM/DD/YYYY',
-    timeFormat: '12h',
-    defaultView: 'week',
-    startOfWeek: 'monday',
+  // Load preferences from localStorage
+  const [preferences, setPreferences] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(PREFERENCES_KEY)
+      if (saved) {
+        try {
+          return JSON.parse(saved)
+        } catch {
+          // ignore
+        }
+      }
+    }
+    return {
+      language: 'en',
+      timezone: 'America/New_York',
+      dateFormat: 'MM/DD/YYYY',
+      timeFormat: '12h',
+      defaultView: 'week',
+      startOfWeek: 'monday',
+    }
   })
 
-  const handleSave = () => {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  // Update profile when user changes
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+        department: user.user_metadata?.department || '',
+      })
+    }
+  }, [user])
+
+  const handleSaveProfile = async () => {
+    setSaving(true)
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          full_name: profile.name,
+          department: profile.department,
+        },
+      })
+
+      if (error) {
+        toast.error('Failed to update profile', { description: error.message })
+      } else {
+        toast.success('Profile updated successfully')
+      }
+    } catch {
+      toast.error('An unexpected error occurred')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSavePreferences = () => {
+    localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences))
+    toast.success('Preferences saved')
+  }
+
+  const handleChangePassword = async () => {
+    setPasswordError(null)
+
+    if (passwords.new !== passwords.confirm) {
+      setPasswordError('New passwords do not match')
+      return
+    }
+
+    if (passwords.new.length < 6) {
+      setPasswordError('Password must be at least 6 characters')
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwords.new,
+      })
+
+      if (error) {
+        setPasswordError(error.message)
+      } else {
+        toast.success('Password updated successfully')
+        setPasswords({ current: '', new: '', confirm: '' })
+      }
+    } catch {
+      setPasswordError('An unexpected error occurred')
+    } finally {
+      setChangingPassword(false)
+    }
   }
 
   return (
@@ -155,15 +253,16 @@ function SettingsPage() {
                       <Input
                         id="email"
                         type="email"
-                        value={profile.email}
-                        onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                        value={userEmail}
+                        disabled
+                        className="bg-muted text-muted-foreground"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="role">Role</Label>
                       <Input
                         id="role"
-                        value={profile.role}
+                        value={userRole}
                         disabled
                         className="bg-muted text-muted-foreground"
                       />
@@ -172,7 +271,7 @@ function SettingsPage() {
                       <Label htmlFor="department">Department</Label>
                       <Select value={profile.department} onValueChange={(v) => setProfile({ ...profile, department: v })}>
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select department" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Computer Science">Computer Science</SelectItem>
@@ -182,6 +281,21 @@ function SettingsPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <Button onClick={handleSaveProfile} disabled={saving} className="w-full sm:w-auto">
+                      {saving ? (
+                        <>
+                          <Loader2 className="mr-2 size-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 size-4" />
+                          Save Profile
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -260,18 +374,9 @@ function SettingsPage() {
               </Card>
 
               <div className="flex justify-end">
-                <Button onClick={handleSave} disabled={saved} className="w-full sm:w-auto">
-                  {saved ? (
-                    <>
-                      <Check className="mr-2 size-4" />
-                      Saved
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 size-4" />
-                      Save Changes
-                    </>
-                  )}
+                <Button onClick={handleSavePreferences} className="w-full sm:w-auto">
+                  <Save className="mr-2 size-4" />
+                  Save Preferences
                 </Button>
               </div>
             </>
@@ -369,18 +474,9 @@ function SettingsPage() {
               </Card>
 
               <div className="flex justify-end">
-                <Button onClick={handleSave} disabled={saved} className="w-full sm:w-auto">
-                  {saved ? (
-                    <>
-                      <Check className="mr-2 size-4" />
-                      Saved
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 size-4" />
-                      Save Changes
-                    </>
-                  )}
+                <Button onClick={handleSavePreferences} className="w-full sm:w-auto">
+                  <Save className="mr-2 size-4" />
+                  Save Preferences
                 </Button>
               </div>
             </>
@@ -396,31 +492,55 @@ function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {passwordError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="size-4" />
+                    <AlertDescription>{passwordError}</AlertDescription>
+                  </Alert>
+                )}
                 <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="current-password">Current Password</Label>
-                    <Input
-                      id="current-password"
-                      type="password"
-                      placeholder="Enter current password"
-                      className="sm:max-w-sm"
-                    />
-                  </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="new-password">New Password</Label>
-                      <Input id="new-password" type="password" placeholder="Enter new password" />
+                      <Input
+                        id="new-password"
+                        type="password"
+                        placeholder="Enter new password"
+                        value={passwords.new}
+                        onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+                        disabled={changingPassword}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="confirm-password">Confirm Password</Label>
-                      <Input id="confirm-password" type="password" placeholder="Confirm new password" />
+                      <Input
+                        id="confirm-password"
+                        type="password"
+                        placeholder="Confirm new password"
+                        value={passwords.confirm}
+                        onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                        disabled={changingPassword}
+                      />
                     </div>
                   </div>
                 </div>
                 <div className="pt-2">
-                  <Button className="w-full sm:w-auto">
-                    <Key className="mr-2 size-4" />
-                    Update Password
+                  <Button
+                    onClick={handleChangePassword}
+                    disabled={changingPassword || !passwords.new || !passwords.confirm}
+                    className="w-full sm:w-auto"
+                  >
+                    {changingPassword ? (
+                      <>
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <Key className="mr-2 size-4" />
+                        Update Password
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>

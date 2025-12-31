@@ -1,17 +1,40 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
-import { Zap, Shield, Clock, ArrowLeft } from 'lucide-react'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
+import { Zap, Shield, Clock, ArrowLeft, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Logo, LogoIcon } from '@/components/logo'
+import SignUpForm from '@/components/forms/signup-form'
+import { useAuth } from '@/contexts/auth-context'
 
 export const Route = createFileRoute('/signup')({
   component: SignUpPage,
 })
 
 function SignUpPage() {
+  const { user, loading } = useAuth()
+  const navigate = useNavigate()
+
+  // Redirect to app if already signed in
+  useEffect(() => {
+    if (!loading && user) {
+      navigate({ to: '/app' })
+    }
+  }, [user, loading, navigate])
+
+  // Show loading state while checking auth
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  // Don't render if authenticated (will redirect)
+  if (user) {
+    return null
+  }
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       {/* Left Panel - Branding */}
@@ -107,64 +130,7 @@ function SignUpPage() {
               </p>
             </div>
 
-            <form className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First name</Label>
-                  <Input
-                    id="firstName"
-                    placeholder="John"
-                    required
-                    className="h-11"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last name</Label>
-                  <Input
-                    id="lastName"
-                    placeholder="Doe"
-                    required
-                    className="h-11"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@university.edu"
-                  required
-                  className="h-11"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Create a password"
-                  required
-                  className="h-11"
-                />
-              </div>
-              <div className="flex items-start space-x-2">
-                <Checkbox id="terms" className="mt-0.5" />
-                <Label htmlFor="terms" className="text-sm font-normal leading-snug text-muted-foreground">
-                  I agree to the{' '}
-                  <Link to="/signup" className="text-foreground hover:underline">
-                    Terms
-                  </Link>{' '}
-                  and{' '}
-                  <Link to="/signup" className="text-foreground hover:underline">
-                    Privacy Policy
-                  </Link>
-                </Label>
-              </div>
-              <Button type="submit" className="h-11 w-full">
-                Create Account
-              </Button>
-            </form>
+            <SignUpForm />
 
             <div className="text-center text-sm text-muted-foreground">
               Already have an account?{' '}
@@ -172,10 +138,6 @@ function SignUpPage() {
                 Sign in
               </Link>
             </div>
-
-            <p className="text-center text-xs text-muted-foreground/60">
-              This is a portfolio demo. No real authentication.
-            </p>
           </div>
         </div>
       </div>

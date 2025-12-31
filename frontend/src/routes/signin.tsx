@@ -1,17 +1,40 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
-import { Calendar, Building2, BookOpen, ArrowLeft } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
-import { ThemeToggle } from '@/components/theme-toggle'
-import { Logo, LogoIcon } from '@/components/logo'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
+import { useEffect } from 'react';
+import { Calendar, Building2, BookOpen, ArrowLeft, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { Logo, LogoIcon } from '@/components/logo';
+import SignInForm from '@/components/forms/signin-form';
+import { useAuth } from '@/contexts/auth-context';
 
 export const Route = createFileRoute('/signin')({
   component: SignInPage,
-})
+});
 
 function SignInPage() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect to app if already signed in
+  useEffect(() => {
+    if (!loading && user) {
+      navigate({ to: '/app' });
+    }
+  }, [user, loading, navigate]);
+
+  // Show loading state while checking auth
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Don't render if authenticated (will redirect)
+  if (user) {
+    return null;
+  }
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       {/* Left Panel - Branding */}
@@ -88,45 +111,7 @@ function SignInPage() {
               </p>
             </div>
 
-            <form className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@university.edu"
-                  required
-                  className="h-11"
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    to="/signin"
-                    className="text-xs text-muted-foreground hover:text-primary"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  required
-                  className="h-11"
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox id="remember" />
-                <Label htmlFor="remember" className="text-sm font-normal">
-                  Remember me for 30 days
-                </Label>
-              </div>
-              <Button type="submit" className="h-11 w-full">
-                Sign In
-              </Button>
-            </form>
+            <SignInForm />
 
             <div className="text-center text-sm text-muted-foreground">
               Don't have an account?{' '}
@@ -142,5 +127,5 @@ function SignInPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

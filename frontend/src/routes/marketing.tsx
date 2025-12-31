@@ -15,6 +15,7 @@ import {
   Menu,
   Tag,
   DoorOpen,
+  LayoutDashboard,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,12 +27,14 @@ import {
   SheetContent,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { useAuth } from '@/contexts/auth-context'
 
 export const Route = createFileRoute('/marketing')({
   component: MarketingPage,
 })
 
 function MarketingPage() {
+  const { user, loading } = useAuth()
   const features = [
     {
       icon: Zap,
@@ -145,12 +148,23 @@ function MarketingPage() {
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <div className="hidden items-center gap-2 sm:flex">
-                <Button variant="ghost" size="sm" asChild>
-                  <Link to="/signin">Sign In</Link>
-                </Button>
-                <Button size="sm" asChild>
-                  <Link to="/signup">Create Account</Link>
-                </Button>
+                {!loading && user ? (
+                  <Button size="sm" asChild>
+                    <Link to="/app">
+                      <LayoutDashboard className="mr-1.5 size-4" />
+                      Dashboard
+                    </Link>
+                  </Button>
+                ) : (
+                  <>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link to="/signin">Sign In</Link>
+                    </Button>
+                    <Button size="sm" asChild>
+                      <Link to="/signup">Create Account</Link>
+                    </Button>
+                  </>
+                )}
               </div>
 
               {/* Mobile Menu */}
@@ -178,12 +192,23 @@ function MarketingPage() {
                       </a>
                     </Button>
                     <div className="my-2 h-px bg-border" />
-                    <Button variant="outline" asChild>
-                      <Link to="/signin">Sign In</Link>
-                    </Button>
-                    <Button asChild>
-                      <Link to="/signup">Create Account</Link>
-                    </Button>
+                    {!loading && user ? (
+                      <Button asChild>
+                        <Link to="/app">
+                          <LayoutDashboard className="mr-2 size-4" />
+                          Go to Dashboard
+                        </Link>
+                      </Button>
+                    ) : (
+                      <>
+                        <Button variant="outline" asChild>
+                          <Link to="/signin">Sign In</Link>
+                        </Button>
+                        <Button asChild>
+                          <Link to="/signup">Create Account</Link>
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </SheetContent>
               </Sheet>
@@ -460,13 +485,15 @@ function MarketingPage() {
                 <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
                   <Button size="lg" asChild>
                     <Link to="/app">
-                      Launch App
+                      {user ? 'Go to Dashboard' : 'Launch App'}
                       <ArrowRight className="ml-2 size-4" />
                     </Link>
                   </Button>
-                  <Button size="lg" variant="outline" asChild>
-                    <Link to="/signup">Create Account</Link>
-                  </Button>
+                  {!user && (
+                    <Button size="lg" variant="outline" asChild>
+                      <Link to="/signup">Create Account</Link>
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

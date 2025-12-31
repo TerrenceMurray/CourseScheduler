@@ -3,52 +3,50 @@ import { useState, useEffect } from 'react';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Separator } from '@/components/ui/separator';
-import
-  {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
-  } from '@/components/ui/breadcrumb';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { Toaster } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
-import
-  {
-    CommandDialog,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-    CommandSeparator,
-  } from '@/components/ui/command';
-import
-  {
-    Search,
-    LayoutDashboard,
-    Calendar,
-    BookOpen,
-    DoorOpen,
-    Building2,
-    Tag,
-    Sparkles,
-    Settings,
-    LogOut,
-    User,
-  } from 'lucide-react';
-import
-  {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-  } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command';
+import {
+  Search,
+  LayoutDashboard,
+  Calendar,
+  BookOpen,
+  DoorOpen,
+  Building2,
+  Tag,
+  Sparkles,
+  Settings,
+  LogOut,
+  User,
+  Loader2,
+} from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useAuth } from '@/contexts/auth-context';
 
 export const Route = createFileRoute('/app')({
   component: AppLayout,
@@ -76,19 +74,23 @@ const navigationItems = [
   { title: 'Settings', href: '/app/settings', icon: Settings },
 ];
 
-function AppLayout ()
-{
+function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, loading, signOut } = useAuth();
   const currentTitle = routeTitles[location.pathname] || 'Dashboard';
   const [commandOpen, setCommandOpen] = useState(false);
 
-  useEffect(() =>
-  {
-    const down = (e: KeyboardEvent) =>
-    {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey))
-      {
+  // Redirect to signin if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate({ to: '/signin' });
+    }
+  }, [user, loading, navigate]);
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setCommandOpen((open) => !open);
       }
@@ -97,11 +99,39 @@ function AppLayout ()
     return () => document.removeEventListener('keydown', down);
   }, []);
 
-  const handleNavigate = (href: string) =>
-  {
+  const handleNavigate = (href: string) => {
     navigate({ to: href });
     setCommandOpen(false);
   };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate({ to: '/signin' });
+  };
+
+  // Get user display info
+  const userEmail = user?.email ?? '';
+  const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || userEmail.split('@')[0];
+  const userInitials = userName
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) || 'U';
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!user) {
+    return null;
+  }
 
   return (
     <SidebarProvider className="h-full min-h-0!">
@@ -145,17 +175,18 @@ function AppLayout ()
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative size-9 rounded-full">
                   <Avatar className="size-9">
-                    <AvatarImage src="/avatar.jpg" alt="User" />
-                    <AvatarFallback className="bg-primary/10 text-primary">JD</AvatarFallback>
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      {userInitials}
+                    </AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">John Doe</p>
+                    <p className="text-sm font-medium leading-none">{userName}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      john.doe@university.edu
+                      {userEmail}
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -169,7 +200,10 @@ function AppLayout ()
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive">
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                >
                   <LogOut className="mr-2 size-4" />
                   Log out
                 </DropdownMenuItem>

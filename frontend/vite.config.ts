@@ -7,6 +7,8 @@ import tailwindcss from '@tailwindcss/vite'
 import { nitro } from 'nitro/vite'
 
 const config = defineConfig({
+  // Load .env from root directory (parent of frontend)
+  envDir: '..',
   server: {
     host: 'localhost',
     port: 5173,

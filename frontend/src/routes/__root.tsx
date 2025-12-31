@@ -2,6 +2,7 @@ import { HeadContent, Link, Outlet, Scripts, createRootRoute } from '@tanstack/r
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from '@/components/ui/sonner'
 import { ThemeProvider } from '@/components/theme-provider'
+import { AuthProvider } from '@/contexts/auth-context'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,7 +57,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body className="h-full overflow-hidden">
         <QueryClientProvider client={queryClient}>
           <ThemeProvider defaultTheme="system">
-            {children}
+            <AuthProvider>
+              {children}
+            </AuthProvider>
           </ThemeProvider>
         </QueryClientProvider>
         <Scripts />
