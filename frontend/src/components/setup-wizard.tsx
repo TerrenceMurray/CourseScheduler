@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import {
   Building2,
@@ -6,7 +5,6 @@ import {
   DoorOpen,
   BookOpen,
   Check,
-  ChevronRight,
   Sparkles,
   ArrowRight,
 } from 'lucide-react'
