@@ -15,8 +15,12 @@ type ScheduleServiceInterface interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Schedule, error)
 	GetByName(ctx context.Context, name string) (*models.Schedule, error)
 	List(ctx context.Context) ([]*models.Schedule, error)
+	ListArchived(ctx context.Context) ([]*models.Schedule, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	Update(ctx context.Context, id uuid.UUID, updates *models.ScheduleUpdate) (*models.Schedule, error)
+	SetActive(ctx context.Context, id uuid.UUID) (*models.Schedule, error)
+	Archive(ctx context.Context, id uuid.UUID) (*models.Schedule, error)
+	Unarchive(ctx context.Context, id uuid.UUID) (*models.Schedule, error)
 }
 
 type ScheduleService struct {
@@ -51,4 +55,20 @@ func (s *ScheduleService) Delete(ctx context.Context, id uuid.UUID) error {
 
 func (s *ScheduleService) Update(ctx context.Context, id uuid.UUID, updates *models.ScheduleUpdate) (*models.Schedule, error) {
 	return s.repo.Update(ctx, id, updates)
+}
+
+func (s *ScheduleService) ListArchived(ctx context.Context) ([]*models.Schedule, error) {
+	return s.repo.ListArchived(ctx)
+}
+
+func (s *ScheduleService) SetActive(ctx context.Context, id uuid.UUID) (*models.Schedule, error) {
+	return s.repo.SetActive(ctx, id)
+}
+
+func (s *ScheduleService) Archive(ctx context.Context, id uuid.UUID) (*models.Schedule, error) {
+	return s.repo.Archive(ctx, id)
+}
+
+func (s *ScheduleService) Unarchive(ctx context.Context, id uuid.UUID) (*models.Schedule, error) {
+	return s.repo.Unarchive(ctx, id)
 }

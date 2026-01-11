@@ -112,6 +112,8 @@ export interface Schedule {
   id: string;
   name: string;
   sessions: ScheduledSession[];
+  is_active: boolean;
+  is_archived: boolean;
   created_at?: string;
 }
 
@@ -123,6 +125,8 @@ export interface ScheduleCreate {
 export interface ScheduleUpdate {
   name?: string;
   sessions?: ScheduledSession[];
+  is_active?: boolean;
+  is_archived?: boolean;
 }
 
 // Scheduler types

@@ -107,3 +107,69 @@ func (h *ScheduleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *ScheduleHandler) ListArchived(w http.ResponseWriter, r *http.Request) {
+	schedules, err := h.service.ListArchived(r.Context())
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "failed to list archived schedules")
+		return
+	}
+	JSON(w, http.StatusOK, schedules)
+}
+
+func (h *ScheduleHandler) SetActive(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	schedule, err := h.service.SetActive(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			Error(w, http.StatusNotFound, "schedule not found")
+			return
+		}
+		Error(w, http.StatusInternalServerError, "failed to set active schedule")
+		return
+	}
+	JSON(w, http.StatusOK, schedule)
+}
+
+func (h *ScheduleHandler) Archive(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	schedule, err := h.service.Archive(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			Error(w, http.StatusNotFound, "schedule not found")
+			return
+		}
+		Error(w, http.StatusInternalServerError, "failed to archive schedule")
+		return
+	}
+	JSON(w, http.StatusOK, schedule)
+}
+
+func (h *ScheduleHandler) Unarchive(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	schedule, err := h.service.Unarchive(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			Error(w, http.StatusNotFound, "schedule not found")
+			return
+		}
+		Error(w, http.StatusInternalServerError, "failed to unarchive schedule")
+		return
+	}
+	JSON(w, http.StatusOK, schedule)
+}

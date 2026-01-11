@@ -159,7 +159,9 @@ func (s *ScheduleRepositorySuite) TestGetByName_NotFoundError() {
 
 // TestList
 func (s *ScheduleRepositorySuite) TestList_Success() {
-	// Creates are in alphabetical order by name
+	// List orders by is_active DESC, then name ASC
+	// Due to the database trigger, when second schedule is created as active,
+	// it deactivates the first one
 	expected1, _ := s.repo.Create(s.ctx, s.createTestSchedule("Fall 2025"))
 	expected2, _ := s.repo.Create(s.ctx, s.createTestSchedule("Spring 2026"))
 
@@ -167,8 +169,12 @@ func (s *ScheduleRepositorySuite) TestList_Success() {
 
 	s.Require().NoError(err)
 	s.Require().Len(actual, 2)
-	s.Require().Equal(expected1.ID, actual[0].ID) // Fall comes before Spring alphabetically
-	s.Require().Equal(expected2.ID, actual[1].ID)
+	// Spring 2026 is active (created last), so it comes first
+	s.Require().Equal(expected2.ID, actual[0].ID)
+	s.Require().True(actual[0].IsActive)
+	// Fall 2025 was deactivated when Spring was created
+	s.Require().Equal(expected1.ID, actual[1].ID)
+	s.Require().False(actual[1].IsActive)
 }
 
 func (s *ScheduleRepositorySuite) TestList_Empty() {
@@ -261,6 +267,110 @@ func (s *ScheduleRepositorySuite) TestUpdate_ValidationError() {
 
 	s.Require().Error(err)
 	s.Require().ErrorContains(err, "validation failed")
+}
+
+// TestSetActive
+func (s *ScheduleRepositorySuite) TestSetActive_Success() {
+	// Create two schedules - second one will be active due to INSERT trigger
+	schedule1, _ := s.repo.Create(s.ctx, s.createTestSchedule("Fall 2025"))
+	schedule2, _ := s.repo.Create(s.ctx, s.createTestSchedule("Spring 2026"))
+
+	// Verify schedule2 is active (created last)
+	s.Require().True(schedule2.IsActive)
+
+	// Set schedule1 as active
+	actual, err := s.repo.SetActive(s.ctx, schedule1.ID)
+
+	s.Require().NoError(err)
+	s.Require().True(actual.IsActive)
+
+	// Verify schedule2 is now inactive
+	schedule2Updated, _ := s.repo.GetByID(s.ctx, schedule2.ID)
+	s.Require().False(schedule2Updated.IsActive)
+}
+
+func (s *ScheduleRepositorySuite) TestSetActive_NotFound() {
+	_, err := s.repo.SetActive(s.ctx, uuid.New())
+
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, repository.ErrNotFound)
+}
+
+// TestArchive
+func (s *ScheduleRepositorySuite) TestArchive_Success() {
+	schedule, _ := s.repo.Create(s.ctx, s.createTestSchedule("Fall 2025"))
+	s.Require().False(schedule.IsArchived)
+
+	actual, err := s.repo.Archive(s.ctx, schedule.ID)
+
+	s.Require().NoError(err)
+	s.Require().True(actual.IsArchived)
+	s.Require().False(actual.IsActive) // Archived schedules should not be active
+}
+
+func (s *ScheduleRepositorySuite) TestArchive_NotFound() {
+	_, err := s.repo.Archive(s.ctx, uuid.New())
+
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, repository.ErrNotFound)
+}
+
+// TestUnarchive
+func (s *ScheduleRepositorySuite) TestUnarchive_Success() {
+	schedule, _ := s.repo.Create(s.ctx, s.createTestSchedule("Fall 2025"))
+	s.repo.Archive(s.ctx, schedule.ID)
+
+	actual, err := s.repo.Unarchive(s.ctx, schedule.ID)
+
+	s.Require().NoError(err)
+	s.Require().False(actual.IsArchived)
+}
+
+func (s *ScheduleRepositorySuite) TestUnarchive_NotFound() {
+	_, err := s.repo.Unarchive(s.ctx, uuid.New())
+
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, repository.ErrNotFound)
+}
+
+// TestListArchived
+func (s *ScheduleRepositorySuite) TestListArchived_Success() {
+	schedule1, _ := s.repo.Create(s.ctx, s.createTestSchedule("Fall 2025"))
+	s.repo.Create(s.ctx, s.createTestSchedule("Spring 2026")) // Not archived
+
+	// Archive schedule1
+	s.repo.Archive(s.ctx, schedule1.ID)
+
+	actual, err := s.repo.ListArchived(s.ctx)
+
+	s.Require().NoError(err)
+	s.Require().Len(actual, 1)
+	s.Require().Equal(schedule1.ID, actual[0].ID)
+	s.Require().True(actual[0].IsArchived)
+}
+
+func (s *ScheduleRepositorySuite) TestListArchived_Empty() {
+	s.repo.Create(s.ctx, s.createTestSchedule("Fall 2025")) // Not archived
+
+	actual, err := s.repo.ListArchived(s.ctx)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(actual)
+	s.Require().Len(actual, 0)
+}
+
+func (s *ScheduleRepositorySuite) TestList_ExcludesArchived() {
+	schedule1, _ := s.repo.Create(s.ctx, s.createTestSchedule("Fall 2025"))
+	schedule2, _ := s.repo.Create(s.ctx, s.createTestSchedule("Spring 2026"))
+
+	// Archive schedule1
+	s.repo.Archive(s.ctx, schedule1.ID)
+
+	actual, err := s.repo.List(s.ctx)
+
+	s.Require().NoError(err)
+	s.Require().Len(actual, 1)
+	s.Require().Equal(schedule2.ID, actual[0].ID) // Only non-archived schedule
 }
 
 // TestScheduleRepositorySuite

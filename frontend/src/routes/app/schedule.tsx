@@ -17,6 +17,10 @@ import {
   EyeOff,
   Sparkles,
   CalendarDays,
+  Archive,
+  ArchiveRestore,
+  MoreVertical,
+  Star,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -50,7 +54,7 @@ import {
 } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
 import { CountUp } from '@/components/count-up'
-import { useSchedules, useCourses, useRooms, useBuildings } from '@/hooks'
+import { useSchedules, useCourses, useRooms, useBuildings, useSetActiveSchedule, useArchiveSchedule, useArchivedSchedules, useUnarchiveSchedule } from '@/hooks'
 import { CardListSkeleton } from '@/components/loading-skeleton'
 import { ErrorState } from '@/components/error-state'
 import { cn } from '@/lib/utils'
@@ -80,9 +84,14 @@ function SchedulePage() {
   const [currentTime, setCurrentTime] = useState(new Date())
 
   const { data: schedules = [], isLoading: schedulesLoading, isError: schedulesError, refetch: refetchSchedules } = useSchedules()
+  const { data: archivedSchedules = [] } = useArchivedSchedules()
   const { data: courses = [] } = useCourses()
   const { data: rooms = [] } = useRooms()
   const { data: buildings = [] } = useBuildings()
+
+  const setActiveMutation = useSetActiveSchedule()
+  const archiveMutation = useArchiveSchedule()
+  const unarchiveMutation = useUnarchiveSchedule()
 
   // Update current time every minute
   useEffect(() => {
@@ -405,7 +414,15 @@ function SchedulePage() {
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between animate-slide-up">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Your Timetable</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight">Your Timetable</h1>
+              {currentSchedule?.is_active && (
+                <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
+                  <Star className="mr-1 size-3 fill-amber-500" />
+                  Active
+                </Badge>
+              )}
+            </div>
             <p className="text-muted-foreground">
               See when and where classes happen
             </p>
@@ -425,12 +442,79 @@ function SchedulePage() {
                 ) : (
                   schedules.map((schedule) => (
                     <SelectItem key={schedule.id} value={schedule.id}>
-                      {schedule.name}
+                      <span className="flex items-center gap-2">
+                        {schedule.is_active && <Star className="size-3 fill-amber-500 text-amber-500" />}
+                        {schedule.name}
+                      </span>
                     </SelectItem>
                   ))
                 )}
               </SelectContent>
             </Select>
+
+            {/* Schedule Actions */}
+            {currentSchedule && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <MoreVertical className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {!currentSchedule.is_active && (
+                    <DropdownMenuItem
+                      onClick={() => setActiveMutation.mutate(currentSchedule.id)}
+                      className="cursor-pointer"
+                      disabled={setActiveMutation.isPending}
+                    >
+                      <Star className="mr-2 size-4" />
+                      Set as Active
+                    </DropdownMenuItem>
+                  )}
+                  {currentSchedule.is_active && (
+                    <DropdownMenuItem disabled className="cursor-not-allowed text-muted-foreground">
+                      <Star className="mr-2 size-4 fill-amber-500 text-amber-500" />
+                      Active Schedule
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onClick={() => archiveMutation.mutate(currentSchedule.id)}
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                    disabled={archiveMutation.isPending}
+                  >
+                    <Archive className="mr-2 size-4" />
+                    Archive Schedule
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Archived Schedules */}
+            {archivedSchedules.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Archive className="mr-2 size-4" />
+                    Archived ({archivedSchedules.length})
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {archivedSchedules.map((schedule) => (
+                    <DropdownMenuItem
+                      key={schedule.id}
+                      onClick={() => unarchiveMutation.mutate(schedule.id)}
+                      className="cursor-pointer"
+                      disabled={unarchiveMutation.isPending}
+                    >
+                      <ArchiveRestore className="mr-2 size-4" />
+                      <span className="truncate">{schedule.name}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Export Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">

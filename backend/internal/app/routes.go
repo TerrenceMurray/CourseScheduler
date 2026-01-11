@@ -74,10 +74,14 @@ func (a *App) setupRoutes() {
 			// Schedules
 			r.Route("/schedules", func(r chi.Router) {
 				r.Get("/", scheduleHandler.List)
+				r.Get("/archived", scheduleHandler.ListArchived)
 				r.Post("/", scheduleHandler.Create)
 				r.Get("/{id}", scheduleHandler.GetByID)
 				r.Put("/{id}", scheduleHandler.Update)
 				r.Delete("/{id}", scheduleHandler.Delete)
+				r.Post("/{id}/set-active", scheduleHandler.SetActive)
+				r.Post("/{id}/archive", scheduleHandler.Archive)
+				r.Post("/{id}/unarchive", scheduleHandler.Unarchive)
 			})
 
 			// Scheduler

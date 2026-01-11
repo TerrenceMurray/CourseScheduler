@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 export const scheduleKeys = {
   all: ['schedules'] as const,
   lists: () => [...scheduleKeys.all, 'list'] as const,
+  archived: () => [...scheduleKeys.all, 'archived'] as const,
   detail: (id: string) => [...scheduleKeys.all, 'detail', id] as const,
 };
 
@@ -67,6 +68,58 @@ export function useDeleteSchedule() {
     },
     onError: (error: Error) => {
       toast.error(`Failed to delete schedule: ${error.message}`);
+    },
+  });
+}
+
+export function useArchivedSchedules() {
+  return useQuery({
+    queryKey: scheduleKeys.archived(),
+    queryFn: schedulesApi.listArchived,
+  });
+}
+
+export function useSetActiveSchedule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => schedulesApi.setActive(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+      toast.success('Schedule set as active');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to set active schedule: ${error.message}`);
+    },
+  });
+}
+
+export function useArchiveSchedule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => schedulesApi.archive(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+      toast.success('Schedule archived');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to archive schedule: ${error.message}`);
+    },
+  });
+}
+
+export function useUnarchiveSchedule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => schedulesApi.unarchive(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+      toast.success('Schedule restored');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to restore schedule: ${error.message}`);
     },
   });
 }

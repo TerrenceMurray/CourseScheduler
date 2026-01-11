@@ -24,8 +24,12 @@ type ScheduleRepositoryInterface interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Schedule, error)
 	GetByName(ctx context.Context, name string) (*models.Schedule, error)
 	List(ctx context.Context) ([]*models.Schedule, error)
+	ListArchived(ctx context.Context) ([]*models.Schedule, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	Update(ctx context.Context, id uuid.UUID, updates *models.ScheduleUpdate) (*models.Schedule, error)
+	SetActive(ctx context.Context, id uuid.UUID) (*models.Schedule, error)
+	Archive(ctx context.Context, id uuid.UUID) (*models.Schedule, error)
+	Unarchive(ctx context.Context, id uuid.UUID) (*models.Schedule, error)
 }
 
 type ScheduleRepository struct {
@@ -125,7 +129,8 @@ func (r *ScheduleRepository) GetByName(ctx context.Context, name string) (*model
 func (r *ScheduleRepository) List(ctx context.Context) ([]*models.Schedule, error) {
 	stmt := table.Schedules.
 		SELECT(table.Schedules.AllColumns).
-		ORDER_BY(table.Schedules.Name.ASC())
+		WHERE(table.Schedules.IsArchived.EQ(Bool(false))).
+		ORDER_BY(table.Schedules.IsActive.DESC(), table.Schedules.Name.ASC())
 
 	var dest []model.Schedules
 	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
@@ -182,8 +187,10 @@ func (r *ScheduleRepository) Update(ctx context.Context, id uuid.UUID, updates *
 
 	var columns ColumnList
 	updateModel := struct {
-		Name     *string `json:"name,omitempty"`
-		Sessions *string `json:"sessions,omitempty"`
+		Name       *string `json:"name,omitempty"`
+		Sessions   *string `json:"sessions,omitempty"`
+		IsActive   *bool   `json:"is_active,omitempty"`
+		IsArchived *bool   `json:"is_archived,omitempty"`
 	}{}
 
 	if updates.Name != nil {
@@ -199,6 +206,14 @@ func (r *ScheduleRepository) Update(ctx context.Context, id uuid.UUID, updates *
 		}
 		sessionsStr := string(sessionsJSON)
 		updateModel.Sessions = &sessionsStr
+	}
+	if updates.IsActive != nil {
+		columns = append(columns, table.Schedules.IsActive)
+		updateModel.IsActive = updates.IsActive
+	}
+	if updates.IsArchived != nil {
+		columns = append(columns, table.Schedules.IsArchived)
+		updateModel.IsArchived = updates.IsArchived
 	}
 
 	if len(columns) == 0 {
@@ -238,5 +253,124 @@ func (r *ScheduleRepository) destToSchedule(dest *model.Schedules) (*models.Sche
 		name = *dest.Name
 	}
 
-	return models.NewSchedule(dest.ID, name, sessions, dest.CreatedAt), nil
+	schedule := models.NewSchedule(dest.ID, name, sessions, dest.CreatedAt)
+
+	// Set is_active and is_archived from database
+	if dest.IsActive != nil {
+		schedule.IsActive = *dest.IsActive
+	}
+	if dest.IsArchived != nil {
+		schedule.IsArchived = *dest.IsArchived
+	}
+
+	return schedule, nil
+}
+
+// ListArchived returns all archived schedules
+func (r *ScheduleRepository) ListArchived(ctx context.Context) ([]*models.Schedule, error) {
+	stmt := table.Schedules.
+		SELECT(table.Schedules.AllColumns).
+		WHERE(table.Schedules.IsArchived.EQ(Bool(true))).
+		ORDER_BY(table.Schedules.Name.ASC())
+
+	var dest []model.Schedules
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
+
+	if err != nil {
+		r.logger.Error("failed to list archived schedules", zap.Error(err))
+		return nil, fmt.Errorf("failed to list archived schedules: %w", err)
+	}
+
+	schedules := make([]*models.Schedule, len(dest))
+	for i := range dest {
+		schedule, err := r.destToSchedule(&dest[i])
+		if err != nil {
+			return nil, err
+		}
+		schedules[i] = schedule
+	}
+
+	return schedules, nil
+}
+
+// SetActive sets a schedule as active and deactivates all other schedules
+func (r *ScheduleRepository) SetActive(ctx context.Context, id uuid.UUID) (*models.Schedule, error) {
+	// First, deactivate all schedules
+	deactivateStmt := table.Schedules.
+		UPDATE(table.Schedules.IsActive).
+		SET(table.Schedules.IsActive.SET(Bool(false))).
+		WHERE(table.Schedules.IsActive.EQ(Bool(true)))
+
+	_, err := deactivateStmt.ExecContext(ctx, database.GetExecutor(ctx, r.db))
+	if err != nil {
+		r.logger.Error("failed to deactivate schedules", zap.Error(err))
+		return nil, fmt.Errorf("failed to deactivate schedules: %w", err)
+	}
+
+	// Then activate the specified schedule
+	activateStmt := table.Schedules.
+		UPDATE(table.Schedules.IsActive).
+		SET(table.Schedules.IsActive.SET(Bool(true))).
+		WHERE(table.Schedules.ID.EQ(UUID(id))).
+		RETURNING(table.Schedules.AllColumns)
+
+	var dest model.Schedules
+	err = activateStmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
+
+	if err != nil {
+		if errors.Is(err, qrm.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		r.logger.Error("failed to activate schedule", zap.Error(err), zap.String("id", id.String()))
+		return nil, fmt.Errorf("failed to activate schedule: %w", err)
+	}
+
+	return r.destToSchedule(&dest)
+}
+
+// Archive marks a schedule as archived
+func (r *ScheduleRepository) Archive(ctx context.Context, id uuid.UUID) (*models.Schedule, error) {
+	updateStmt := table.Schedules.
+		UPDATE(table.Schedules.IsArchived, table.Schedules.IsActive).
+		SET(
+			table.Schedules.IsArchived.SET(Bool(true)),
+			table.Schedules.IsActive.SET(Bool(false)),
+		).
+		WHERE(table.Schedules.ID.EQ(UUID(id))).
+		RETURNING(table.Schedules.AllColumns)
+
+	var dest model.Schedules
+	err := updateStmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
+
+	if err != nil {
+		if errors.Is(err, qrm.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		r.logger.Error("failed to archive schedule", zap.Error(err), zap.String("id", id.String()))
+		return nil, fmt.Errorf("failed to archive schedule: %w", err)
+	}
+
+	return r.destToSchedule(&dest)
+}
+
+// Unarchive restores a schedule from archived state
+func (r *ScheduleRepository) Unarchive(ctx context.Context, id uuid.UUID) (*models.Schedule, error) {
+	updateStmt := table.Schedules.
+		UPDATE(table.Schedules.IsArchived).
+		SET(table.Schedules.IsArchived.SET(Bool(false))).
+		WHERE(table.Schedules.ID.EQ(UUID(id))).
+		RETURNING(table.Schedules.AllColumns)
+
+	var dest model.Schedules
+	err := updateStmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
+
+	if err != nil {
+		if errors.Is(err, qrm.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		r.logger.Error("failed to unarchive schedule", zap.Error(err), zap.String("id", id.String()))
+		return nil, fmt.Errorf("failed to unarchive schedule: %w", err)
+	}
+
+	return r.destToSchedule(&dest)
 }

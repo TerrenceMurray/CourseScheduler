@@ -195,12 +195,16 @@ func (m *MockRoomTypeRepository) Update(ctx context.Context, name string, update
 
 // MockScheduleRepository is a mock implementation of ScheduleRepositoryInterface
 type MockScheduleRepository struct {
-	CreateFunc    func(ctx context.Context, schedule *models.Schedule) (*models.Schedule, error)
-	GetByIDFunc   func(ctx context.Context, id uuid.UUID) (*models.Schedule, error)
-	GetByNameFunc func(ctx context.Context, name string) (*models.Schedule, error)
-	ListFunc      func(ctx context.Context) ([]*models.Schedule, error)
-	DeleteFunc    func(ctx context.Context, id uuid.UUID) error
-	UpdateFunc    func(ctx context.Context, id uuid.UUID, updates *models.ScheduleUpdate) (*models.Schedule, error)
+	CreateFunc       func(ctx context.Context, schedule *models.Schedule) (*models.Schedule, error)
+	GetByIDFunc      func(ctx context.Context, id uuid.UUID) (*models.Schedule, error)
+	GetByNameFunc    func(ctx context.Context, name string) (*models.Schedule, error)
+	ListFunc         func(ctx context.Context) ([]*models.Schedule, error)
+	ListArchivedFunc func(ctx context.Context) ([]*models.Schedule, error)
+	DeleteFunc       func(ctx context.Context, id uuid.UUID) error
+	UpdateFunc       func(ctx context.Context, id uuid.UUID, updates *models.ScheduleUpdate) (*models.Schedule, error)
+	SetActiveFunc    func(ctx context.Context, id uuid.UUID) (*models.Schedule, error)
+	ArchiveFunc      func(ctx context.Context, id uuid.UUID) (*models.Schedule, error)
+	UnarchiveFunc    func(ctx context.Context, id uuid.UUID) (*models.Schedule, error)
 }
 
 var _ repository.ScheduleRepositoryInterface = (*MockScheduleRepository)(nil)
@@ -227,4 +231,20 @@ func (m *MockScheduleRepository) Delete(ctx context.Context, id uuid.UUID) error
 
 func (m *MockScheduleRepository) Update(ctx context.Context, id uuid.UUID, updates *models.ScheduleUpdate) (*models.Schedule, error) {
 	return m.UpdateFunc(ctx, id, updates)
+}
+
+func (m *MockScheduleRepository) ListArchived(ctx context.Context) ([]*models.Schedule, error) {
+	return m.ListArchivedFunc(ctx)
+}
+
+func (m *MockScheduleRepository) SetActive(ctx context.Context, id uuid.UUID) (*models.Schedule, error) {
+	return m.SetActiveFunc(ctx, id)
+}
+
+func (m *MockScheduleRepository) Archive(ctx context.Context, id uuid.UUID) (*models.Schedule, error) {
+	return m.ArchiveFunc(ctx, id)
+}
+
+func (m *MockScheduleRepository) Unarchive(ctx context.Context, id uuid.UUID) (*models.Schedule, error) {
+	return m.UnarchiveFunc(ctx, id)
 }

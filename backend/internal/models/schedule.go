@@ -19,10 +19,12 @@ type ScheduledSession struct {
 
 // Schedule represents a complete schedule with all sessions
 type Schedule struct {
-	ID        uuid.UUID          `json:"id"`
-	Name      string             `json:"name"`
-	Sessions  []ScheduledSession `json:"sessions"`
-	CreatedAt *time.Time         `json:"created_at,omitempty"`
+	ID         uuid.UUID          `json:"id"`
+	Name       string             `json:"name"`
+	Sessions   []ScheduledSession `json:"sessions"`
+	IsActive   bool               `json:"is_active"`
+	IsArchived bool               `json:"is_archived"`
+	CreatedAt  *time.Time         `json:"created_at,omitempty"`
 }
 
 func NewSchedule(
@@ -32,10 +34,12 @@ func NewSchedule(
 	createdAt *time.Time,
 ) *Schedule {
 	return &Schedule{
-		ID:        id,
-		Name:      name,
-		Sessions:  sessions,
-		CreatedAt: createdAt,
+		ID:         id,
+		Name:       name,
+		Sessions:   sessions,
+		IsActive:   false,
+		IsArchived: false,
+		CreatedAt:  createdAt,
 	}
 }
 
@@ -59,8 +63,10 @@ func (s *Schedule) Validate() error {
 
 // ScheduleUpdate represents partial update fields for a Schedule.
 type ScheduleUpdate struct {
-	Name     *string            `json:"name,omitempty"`
-	Sessions []ScheduledSession `json:"sessions,omitempty"`
+	Name       *string            `json:"name,omitempty"`
+	Sessions   []ScheduledSession `json:"sessions,omitempty"`
+	IsActive   *bool              `json:"is_active,omitempty"`
+	IsArchived *bool              `json:"is_archived,omitempty"`
 }
 
 func (u *ScheduleUpdate) Validate() error {
