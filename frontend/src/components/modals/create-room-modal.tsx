@@ -166,11 +166,11 @@ export function CreateRoomModal({
             </div>
           )}
 
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit" disabled={!formData.name || !formData.building || !formData.type}>
+            <Button type="submit" disabled={!formData.name || !formData.building || !formData.type} className="w-full sm:w-auto">
               Add Room
             </Button>
           </DialogFooter>

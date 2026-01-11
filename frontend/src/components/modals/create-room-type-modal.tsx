@@ -80,11 +80,11 @@ export function CreateRoomTypeModal({ open, onOpenChange, onSubmit, isLoading }:
             )}
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" />

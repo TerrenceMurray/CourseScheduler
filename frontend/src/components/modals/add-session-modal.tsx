@@ -204,11 +204,11 @@ export function AddSessionModal({
             </p>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit" disabled={!formData.requiredRoom || isLoading}>
+            <Button type="submit" disabled={!formData.requiredRoom || isLoading} className="w-full sm:w-auto">
               {isLoading ? 'Adding...' : 'Add Session'}
             </Button>
           </DialogFooter>

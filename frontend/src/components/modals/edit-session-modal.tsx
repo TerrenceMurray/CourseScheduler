@@ -221,11 +221,11 @@ export function EditSessionModal({
             </p>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit" disabled={!formData.requiredRoom || !hasChanges || isLoading}>
+            <Button type="submit" disabled={!formData.requiredRoom || !hasChanges || isLoading} className="w-full sm:w-auto">
               {isLoading ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>

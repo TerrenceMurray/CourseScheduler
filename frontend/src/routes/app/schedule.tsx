@@ -3,8 +3,6 @@ import { useState, useMemo, useEffect } from 'react'
 import {
   Calendar,
   Clock,
-  ChevronLeft,
-  ChevronRight,
   Download,
   BookOpen,
   DoorOpen,
@@ -21,6 +19,7 @@ import {
   ArchiveRestore,
   MoreVertical,
   Star,
+  Loader2,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -41,11 +40,30 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import {
   Tooltip,
   TooltipContent,
@@ -53,11 +71,11 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
-import { CountUp } from '@/components/count-up'
 import { useSchedules, useCourses, useRooms, useBuildings, useSetActiveSchedule, useArchiveSchedule, useArchivedSchedules, useUnarchiveSchedule } from '@/hooks'
 import { CardListSkeleton } from '@/components/loading-skeleton'
 import { ErrorState } from '@/components/error-state'
 import { cn } from '@/lib/utils'
+import type { Schedule } from '@/types/api'
 
 export const Route = createFileRoute('/app/schedule')({
   component: SchedulePage,
@@ -82,9 +100,12 @@ function SchedulePage() {
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>('')
   const [hiddenCourses, setHiddenCourses] = useState<Set<string>>(new Set())
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
+  const [scheduleToArchive, setScheduleToArchive] = useState<Schedule | null>(null)
+  const [archivedSheetOpen, setArchivedSheetOpen] = useState(false)
 
   const { data: schedules = [], isLoading: schedulesLoading, isError: schedulesError, refetch: refetchSchedules } = useSchedules()
-  const { data: archivedSchedules = [] } = useArchivedSchedules()
+  const { data: archivedSchedules = [], isLoading: archivedLoading } = useArchivedSchedules()
   const { data: courses = [] } = useCourses()
   const { data: rooms = [] } = useRooms()
   const { data: buildings = [] } = useBuildings()
@@ -92,6 +113,40 @@ function SchedulePage() {
   const setActiveMutation = useSetActiveSchedule()
   const archiveMutation = useArchiveSchedule()
   const unarchiveMutation = useUnarchiveSchedule()
+
+  const handleArchiveClick = (schedule: Schedule) => {
+    setScheduleToArchive(schedule)
+    setArchiveDialogOpen(true)
+  }
+
+  const handleConfirmArchive = () => {
+    if (scheduleToArchive) {
+      archiveMutation.mutate(scheduleToArchive.id, {
+        onSuccess: () => {
+          setArchiveDialogOpen(false)
+          setScheduleToArchive(null)
+          // Switch to another schedule if we archived the current one
+          if (scheduleToArchive.id === currentSchedule?.id && schedules.length > 1) {
+            const nextSchedule = schedules.find(s => s.id !== scheduleToArchive.id)
+            if (nextSchedule) setSelectedScheduleId(nextSchedule.id)
+          }
+        },
+      })
+    }
+  }
+
+  const handleUnarchive = (schedule: Schedule) => {
+    unarchiveMutation.mutate(schedule.id)
+  }
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Unknown date'
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }
 
   // Update current time every minute
   useEffect(() => {
@@ -229,15 +284,7 @@ function SchedulePage() {
   }
 
   const uniqueCourses = [...new Set(sessions.map(s => s.course))]
-  const uniqueRooms = [...new Set(sessions.map(s => s.room))]
   const totalHours = sessions.reduce((sum, s) => sum + s.duration, 0)
-
-  const stats = [
-    { title: 'Classes/Week', value: sessions.length.toString(), icon: Calendar, iconBg: 'bg-blue-500/10', iconColor: 'text-blue-500' },
-    { title: 'Courses', value: uniqueCourses.length.toString(), icon: BookOpen, iconBg: 'bg-violet-500/10', iconColor: 'text-violet-500' },
-    { title: 'Rooms Used', value: uniqueRooms.length.toString(), icon: DoorOpen, iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500' },
-    { title: 'Total Hours', value: `${totalHours}h`, icon: Clock, iconBg: 'bg-amber-500/10', iconColor: 'text-amber-500' },
-  ]
 
   if (schedulesLoading) {
     return (
@@ -410,29 +457,24 @@ function SchedulePage() {
 
   return (
     <TooltipProvider>
-      <div className="flex flex-1 flex-col gap-6 animate-fade-in">
+      <div className="flex flex-1 flex-col gap-4 animate-fade-in">
         {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between animate-slide-up">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">Your Timetable</h1>
-              {currentSchedule?.is_active && (
-                <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
-                  <Star className="mr-1 size-3 fill-amber-500" />
-                  Active
-                </Badge>
-              )}
-            </div>
-            <p className="text-muted-foreground">
-              See when and where classes happen
-            </p>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between animate-slide-up">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight">Timetable</h1>
+            {currentSchedule?.is_active && (
+              <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
+                <Star className="mr-1 size-3 fill-amber-500" />
+                Active
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Select
               value={currentSchedule?.id || ''}
               onValueChange={setSelectedScheduleId}
             >
-              <SelectTrigger className="w-52">
+              <SelectTrigger className="w-44">
                 <Calendar className="mr-2 size-4" />
                 <SelectValue placeholder="Select schedule" />
               </SelectTrigger>
@@ -467,7 +509,11 @@ function SchedulePage() {
                       className="cursor-pointer"
                       disabled={setActiveMutation.isPending}
                     >
-                      <Star className="mr-2 size-4" />
+                      {setActiveMutation.isPending ? (
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                      ) : (
+                        <Star className="mr-2 size-4" />
+                      )}
                       Set as Active
                     </DropdownMenuItem>
                   )}
@@ -477,10 +523,10 @@ function SchedulePage() {
                       Active Schedule
                     </DropdownMenuItem>
                   )}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={() => archiveMutation.mutate(currentSchedule.id)}
+                    onClick={() => handleArchiveClick(currentSchedule)}
                     className="cursor-pointer text-destructive focus:text-destructive"
-                    disabled={archiveMutation.isPending}
                   >
                     <Archive className="mr-2 size-4" />
                     Archive Schedule
@@ -489,30 +535,82 @@ function SchedulePage() {
               </DropdownMenu>
             )}
 
-            {/* Archived Schedules */}
-            {archivedSchedules.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Archive className="mr-2 size-4" />
-                    Archived ({archivedSchedules.length})
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  {archivedSchedules.map((schedule) => (
-                    <DropdownMenuItem
-                      key={schedule.id}
-                      onClick={() => unarchiveMutation.mutate(schedule.id)}
-                      className="cursor-pointer"
-                      disabled={unarchiveMutation.isPending}
-                    >
-                      <ArchiveRestore className="mr-2 size-4" />
-                      <span className="truncate">{schedule.name}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            {/* Archived Schedules Sheet */}
+            <Sheet open={archivedSheetOpen} onOpenChange={setArchivedSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Archive className="size-4" />
+                  {archivedSchedules.length > 0 && (
+                    <span className="absolute -top-1 -right-1 size-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center">
+                      {archivedSchedules.length}
+                    </span>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-md flex flex-col px-0">
+                <SheetHeader className="space-y-1 px-6">
+                  <SheetTitle className="flex items-center gap-2">
+                    <Archive className="size-5" />
+                    Archived Schedules
+                  </SheetTitle>
+                  <SheetDescription>
+                    Schedules you've archived are stored here. Restore them anytime.
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="flex-1 mt-6 overflow-y-auto px-6">
+                  {archivedLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : archivedSchedules.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <div className="rounded-full bg-muted p-4 mb-4">
+                        <Archive className="size-8 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-sm font-medium mb-1">No archived schedules</h3>
+                      <p className="text-sm text-muted-foreground max-w-[220px]">
+                        Schedules you archive will appear here for safekeeping.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {archivedSchedules.map((schedule) => (
+                        <div
+                          key={schedule.id}
+                          className="rounded-lg border bg-card p-4 space-y-3"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-lg p-2.5 bg-muted shrink-0">
+                              <CalendarDays className="size-4 text-muted-foreground" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium leading-tight">{schedule.name}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Created {formatDate(schedule.created_at)}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUnarchive(schedule)}
+                            disabled={unarchiveMutation.isPending}
+                            className="w-full"
+                          >
+                            {unarchiveMutation.isPending ? (
+                              <Loader2 className="mr-2 size-4 animate-spin" />
+                            ) : (
+                              <ArchiveRestore className="mr-2 size-4" />
+                            )}
+                            Restore Schedule
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
 
             {/* Export Menu */}
             <DropdownMenu>
@@ -564,104 +662,86 @@ function SchedulePage() {
           </Card>
         )}
 
-        {/* Current/Next Session Banner */}
-        {(currentSession || nextSession) && (
-          <Card className={cn(
-            "border-l-4 transition-colors",
-            currentSession ? "border-l-emerald-500 bg-emerald-500/5" : "border-l-blue-500 bg-blue-500/5"
-          )}>
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "rounded-full p-2.5",
-                    currentSession ? "bg-emerald-500/10" : "bg-blue-500/10"
-                  )}>
-                    {currentSession ? (
-                      <CheckCircle2 className="size-5 text-emerald-500" />
-                    ) : (
-                      <Clock className="size-5 text-blue-500" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "text-xs font-medium uppercase tracking-wide",
-                        currentSession ? "text-emerald-500" : "text-blue-500"
-                      )}>
-                        {currentSession ? "Happening Now" : "Up Next"}
-                      </span>
-                    </div>
-                    <p className="font-semibold">
+        {/* Schedule Tabs - Moved to top for immediate visibility */}
+        {sessions.length > 0 && (
+          <Tabs defaultValue="week" className="space-y-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <TabsList>
+                <TabsTrigger value="week">Week View</TabsTrigger>
+                <TabsTrigger value="room">By Room</TabsTrigger>
+                <TabsTrigger value="course">By Course</TabsTrigger>
+              </TabsList>
+
+              {/* Compact Stats */}
+              <div className="flex items-center gap-3 text-sm">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Calendar className="size-4 text-blue-500" />
+                  <span className="font-medium text-foreground">{sessions.length}</span>
+                  <span className="hidden sm:inline">classes</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <BookOpen className="size-4 text-violet-500" />
+                  <span className="font-medium text-foreground">{uniqueCourses.length}</span>
+                  <span className="hidden sm:inline">courses</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Clock className="size-4 text-amber-500" />
+                  <span className="font-medium text-foreground">{totalHours}h</span>
+                  <span className="hidden sm:inline">/week</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Current/Next Session Banner - Compact */}
+            {(currentSession || nextSession) && (
+              <div className={cn(
+                "flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg border-l-4",
+                currentSession ? "border-l-emerald-500 bg-emerald-500/5" : "border-l-blue-500 bg-blue-500/5"
+              )}>
+                <div className="flex items-center gap-3">
+                  {currentSession ? (
+                    <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
+                  ) : (
+                    <Clock className="size-4 text-blue-500 shrink-0" />
+                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={cn(
+                      "text-xs font-medium uppercase tracking-wide",
+                      currentSession ? "text-emerald-600" : "text-blue-600"
+                    )}>
+                      {currentSession ? "Now" : "Next"}
+                    </span>
+                    <span className="font-medium text-sm">
                       {currentSession?.course || nextSession?.course}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
+                    </span>
+                    <span className="text-sm text-muted-foreground">
                       {currentSession ? (
-                        <>
-                          {currentSession.room} • Ends at {formatHour(currentSession.startHour + currentSession.duration)}
-                        </>
+                        <>in {currentSession.room}</>
                       ) : nextSession && (
-                        <>
-                          {nextSession.day} at {formatHour(nextSession.startHour)} • {nextSession.room}
-                        </>
+                        <>{nextSession.day} {formatHour(nextSession.startHour)}</>
                       )}
-                    </p>
+                    </span>
                   </div>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="h-7 text-xs shrink-0"
                   onClick={() => setSelectedSession(currentSession || nextSession)}
                 >
-                  View Details
+                  Details
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
 
-        {/* Stats */}
-        {sessions.length > 0 && (
-          <div className="grid gap-4 md:grid-cols-4 animate-stagger">
-            {stats.map((stat) => (
-              <Card key={stat.title}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                  <div className={`rounded-lg p-2 ${stat.iconBg}`}>
-                    <stat.icon className={`size-4 ${stat.iconColor}`} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold"><CountUp value={stat.value} /></div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Course Legend/Filter */}
-        {uniqueCourses.length > 0 && (
-          <Card>
-            <CardHeader className="py-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Courses</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setHiddenCourses(new Set())}
-                  className="text-xs h-7"
-                >
-                  Show All
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="flex flex-wrap gap-2">
+            {/* Course Filter - Compact horizontal strip */}
+            {uniqueCourses.length > 0 && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                <span className="text-xs text-muted-foreground shrink-0">Filter:</span>
                 {uniqueCourses.map((courseName) => {
                   const session = sessions.find(s => s.course === courseName)
                   const colors = getColorClasses(session?.color || 'blue')
                   const isHidden = hiddenCourses.has(courseName)
-                  const courseSessionCount = sessions.filter(s => s.course === courseName).length
 
                   return (
                     <Tooltip key={courseName}>
@@ -669,54 +749,38 @@ function SchedulePage() {
                         <button
                           onClick={() => toggleCourseVisibility(courseName)}
                           className={cn(
-                            "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+                            "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all shrink-0",
                             isHidden
                               ? "bg-muted text-muted-foreground opacity-50"
                               : `${colors.bg} ${colors.text}`
                           )}
                         >
                           <span className={cn(
-                            "size-2 rounded-full",
+                            "size-1.5 rounded-full",
                             isHidden ? "bg-muted-foreground" : colors.solid
                           )} />
-                          <span className="truncate max-w-32">{courseName}</span>
-                          {isHidden ? (
-                            <EyeOff className="size-3" />
-                          ) : (
-                            <span className="text-xs opacity-70">{courseSessionCount}x</span>
-                          )}
+                          <span className="truncate max-w-24">{courseName}</span>
+                          {isHidden && <EyeOff className="size-3" />}
                         </button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>{isHidden ? 'Click to show' : 'Click to hide'} {courseName}</p>
+                        <p>{isHidden ? 'Show' : 'Hide'} {courseName}</p>
                       </TooltipContent>
                     </Tooltip>
                   )
                 })}
+                {hiddenCourses.size > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setHiddenCourses(new Set())}
+                    className="text-xs h-6 px-2 shrink-0"
+                  >
+                    Show all
+                  </Button>
+                )}
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Schedule Tabs */}
-        {sessions.length > 0 && (
-          <Tabs defaultValue="week" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <TabsList>
-                <TabsTrigger value="week">Week View</TabsTrigger>
-                <TabsTrigger value="room">By Room</TabsTrigger>
-                <TabsTrigger value="course">By Course</TabsTrigger>
-              </TabsList>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" className="size-8">
-                  <ChevronLeft className="size-4" />
-                </Button>
-                <Button variant="outline" size="sm">Today</Button>
-                <Button variant="outline" size="icon" className="size-8">
-                  <ChevronRight className="size-4" />
-                </Button>
-              </div>
-            </div>
+            )}
 
             {/* Week View */}
             <TabsContent value="week">
@@ -912,8 +976,8 @@ function SchedulePage() {
                   const totalRoomHours = roomSessions.reduce((sum, s) => sum + s.duration, 0)
 
                   return (
-                    <Card key={room} className="overflow-hidden hover:shadow-md transition-shadow">
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 border-b bg-muted/30">
+                    <Card key={room} className="overflow-hidden hover:shadow-md transition-shadow pt-0">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 py-4 border-b bg-muted/30">
                         <div className="flex items-center gap-3">
                           <div className="rounded-lg p-2.5 bg-primary/10">
                             <DoorOpen className="size-5 text-primary" />
@@ -986,8 +1050,8 @@ function SchedulePage() {
                   const uniqueRoomsForCourse = [...new Set(courseSessions.map(s => s.room))]
 
                   return (
-                    <Card key={courseName} className="overflow-hidden hover:shadow-md transition-shadow">
-                      <CardHeader className={cn("flex flex-row items-center justify-between space-y-0 pb-3 border-b", colors.bg)}>
+                    <Card key={courseName} className="overflow-hidden hover:shadow-md transition-shadow pt-0">
+                      <CardHeader className={cn("flex flex-row items-center justify-between space-y-0 py-4 border-b", colors.bg)}>
                         <div className="flex items-center gap-3">
                           <div className={cn("w-1 h-12 rounded-full", colors.solid)} />
                           <div>
@@ -1130,6 +1194,55 @@ function SchedulePage() {
             })()}
           </DialogContent>
         </Dialog>
+
+        {/* Archive Confirmation Dialog */}
+        <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+          <AlertDialogContent className="sm:max-w-md">
+            <AlertDialogHeader className="space-y-3">
+              <div className="mx-auto rounded-full bg-destructive/10 p-3">
+                <Archive className="size-6 text-destructive" />
+              </div>
+              <AlertDialogTitle className="text-center">
+                Archive Schedule
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-center space-y-2">
+                <span>
+                  Are you sure you want to archive <span className="font-medium text-foreground">"{scheduleToArchive?.name}"</span>?
+                </span>
+                {scheduleToArchive?.is_active && (
+                  <span className="block text-amber-600">
+                    This is currently the active schedule. Archiving it will deactivate it.
+                  </span>
+                )}
+                <span className="block text-muted-foreground">
+                  You can restore it anytime from the Archived schedules panel.
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col gap-2 sm:flex-col mt-4">
+              <AlertDialogAction
+                onClick={handleConfirmArchive}
+                disabled={archiveMutation.isPending}
+                className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {archiveMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Archiving...
+                  </>
+                ) : (
+                  <>
+                    <Archive className="mr-2 size-4" />
+                    Archive Schedule
+                  </>
+                )}
+              </AlertDialogAction>
+              <AlertDialogCancel disabled={archiveMutation.isPending} className="w-full">
+                Cancel
+              </AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </TooltipProvider>
   )
