@@ -23,6 +23,7 @@ func (a *App) setupRoutes() {
 		// Protected Routes
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(a.Config.JWTSecretKey))
+			r.Use(middleware.TransactionMiddleware(a.DB))
 
 			// Buildings
 			r.Route("/buildings", func(r chi.Router) {

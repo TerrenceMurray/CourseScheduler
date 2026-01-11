@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TerrenceMurray/course-scheduler/internal/database"
 	"github.com/TerrenceMurray/course-scheduler/internal/database/postgres/scheduler/model"
 	"github.com/TerrenceMurray/course-scheduler/internal/database/postgres/scheduler/table"
 	"github.com/TerrenceMurray/course-scheduler/internal/models"
@@ -48,12 +49,15 @@ func (c *CourseRepository) Create(ctx context.Context, course *models.Course) (*
 	}
 
 	insertStmt := table.Courses.
-		INSERT(table.Courses.AllColumns).
+		INSERT(
+			table.Courses.ID,
+			table.Courses.Name,
+		).
 		MODEL(course).
 		RETURNING(table.Courses.AllColumns)
 
 	var dest model.Courses
-	err := insertStmt.QueryContext(ctx, c.db, &dest)
+	err := insertStmt.QueryContext(ctx, database.GetExecutor(ctx, c.db), &dest)
 
 	if err != nil {
 		c.logger.Error("failed to create course", zap.Error(err))
@@ -111,7 +115,10 @@ func (c *CourseRepository) CreateBatch(ctx context.Context, courses []*models.Co
 		}
 
 		insertStmt := table.Courses.
-			INSERT(table.Courses.AllColumns).
+			INSERT(
+				table.Courses.ID,
+				table.Courses.Name,
+			).
 			MODEL(course).
 			RETURNING(table.Courses.AllColumns)
 
@@ -138,7 +145,7 @@ func (c *CourseRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.C
 		WHERE(table.Courses.ID.EQ(UUID(id)))
 
 	var dest model.Courses
-	err := stmt.QueryContext(ctx, c.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, c.db), &dest)
 
 	if err != nil {
 		if errors.Is(err, qrm.ErrNoRows) {
@@ -157,7 +164,7 @@ func (c *CourseRepository) List(ctx context.Context) ([]models.Course, error) {
 		ORDER_BY(table.Courses.Name.ASC())
 
 	var dest []model.Courses
-	err := stmt.QueryContext(ctx, c.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, c.db), &dest)
 
 	if err != nil {
 		c.logger.Error("failed to list courses", zap.Error(err))
@@ -202,7 +209,7 @@ func (c *CourseRepository) Update(ctx context.Context, id uuid.UUID, updates *mo
 		RETURNING(table.Courses.AllColumns)
 
 	var dest model.Courses
-	err := updateStmt.QueryContext(ctx, c.db, &dest)
+	err := updateStmt.QueryContext(ctx, database.GetExecutor(ctx, c.db), &dest)
 
 	if err != nil {
 		if errors.Is(err, qrm.ErrNoRows) {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TerrenceMurray/course-scheduler/internal/database"
 	"github.com/TerrenceMurray/course-scheduler/internal/database/postgres/scheduler/model"
 	"github.com/TerrenceMurray/course-scheduler/internal/database/postgres/scheduler/table"
 	"github.com/TerrenceMurray/course-scheduler/internal/models"
@@ -50,13 +51,17 @@ func (r *RoomRepository) Create(ctx context.Context, room *models.Room) (*models
 
 	createStmt := table.Rooms.
 		INSERT(
-			table.Rooms.AllColumns.Except(table.Rooms.UpdatedAt),
+			table.Rooms.ID,
+			table.Rooms.Name,
+			table.Rooms.Type,
+			table.Rooms.Building,
+			table.Rooms.Capacity,
 		).
 		MODEL(room).
 		RETURNING(table.Rooms.AllColumns)
 
 	var dest model.Rooms
-	if err := createStmt.QueryContext(ctx, r.db, &dest); err != nil {
+	if err := createStmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest); err != nil {
 		r.logger.Error("failed to create room", zap.Error(err))
 		return nil, fmt.Errorf("failed to create room: %w", err)
 	}
@@ -88,7 +93,13 @@ func (r *RoomRepository) CreateBatch(ctx context.Context, rooms []*models.Room) 
 		}
 
 		insertStmt := table.Rooms.
-			INSERT(table.Rooms.AllColumns.Except(table.Rooms.UpdatedAt)).
+			INSERT(
+				table.Rooms.ID,
+				table.Rooms.Name,
+				table.Rooms.Type,
+				table.Rooms.Building,
+				table.Rooms.Capacity,
+			).
 			MODEL(room).
 			RETURNING(table.Rooms.AllColumns)
 
@@ -115,7 +126,7 @@ func (r *RoomRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Roo
 		WHERE(table.Rooms.ID.EQ(UUID(id)))
 
 	var dest model.Rooms
-	err := stmt.QueryContext(ctx, r.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		if errors.Is(err, qrm.ErrNoRows) {
@@ -134,7 +145,7 @@ func (r *RoomRepository) List(ctx context.Context) ([]*models.Room, error) {
 		ORDER_BY(table.Rooms.Name.ASC())
 
 	var dest []model.Rooms
-	err := stmt.QueryContext(ctx, r.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		r.logger.Error("failed to list rooms", zap.Error(err))
@@ -207,7 +218,7 @@ func (r *RoomRepository) Update(ctx context.Context, id uuid.UUID, updates *mode
 		RETURNING(table.Rooms.AllColumns)
 
 	var dest model.Rooms
-	err := updateStmt.QueryContext(ctx, r.db, &dest)
+	err := updateStmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		if errors.Is(err, qrm.ErrNoRows) {

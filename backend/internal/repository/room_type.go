@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TerrenceMurray/course-scheduler/internal/database"
 	"github.com/TerrenceMurray/course-scheduler/internal/database/postgres/scheduler/model"
 	"github.com/TerrenceMurray/course-scheduler/internal/database/postgres/scheduler/table"
 	"github.com/TerrenceMurray/course-scheduler/internal/models"
@@ -52,7 +53,7 @@ func (r *RoomTypeRepository) Create(ctx context.Context, roomType *models.RoomTy
 		RETURNING(table.RoomTypes.AllColumns)
 
 	var dest model.RoomTypes
-	if err := insertStmt.QueryContext(ctx, r.db, &dest); err != nil {
+	if err := insertStmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest); err != nil {
 		r.logger.Error("failed to create room type", zap.Error(err))
 		return nil, fmt.Errorf("failed to create room type: %w", err)
 	}
@@ -86,9 +87,7 @@ func (r *RoomTypeRepository) CreateBatch(ctx context.Context, roomTypes []*model
 		}
 
 		insertStmt := table.RoomTypes.
-			INSERT(
-				table.RoomTypes.AllColumns.Except(table.RoomTypes.UpdatedAt),
-			).
+			INSERT(table.RoomTypes.Name).
 			MODEL(roomType).
 			RETURNING(table.RoomTypes.AllColumns)
 
@@ -158,7 +157,7 @@ func (r *RoomTypeRepository) Update(ctx context.Context, name string, updates *m
 		RETURNING(table.RoomTypes.AllColumns)
 
 	var dest model.RoomTypes
-	err := updateStmt.QueryContext(ctx, r.db, &dest)
+	err := updateStmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		if errors.Is(err, qrm.ErrNoRows) {
@@ -177,7 +176,7 @@ func (r *RoomTypeRepository) GetByName(ctx context.Context, name string) (*model
 		WHERE(table.RoomTypes.Name.EQ(String(name)))
 
 	var dest model.RoomTypes
-	err := stmt.QueryContext(ctx, r.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		if errors.Is(err, qrm.ErrNoRows) {
@@ -196,7 +195,7 @@ func (r *RoomTypeRepository) List(ctx context.Context) ([]*models.RoomType, erro
 		ORDER_BY(table.RoomTypes.Name.ASC())
 
 	var dest []model.RoomTypes
-	err := stmt.QueryContext(ctx, r.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		r.logger.Error("failed to list room types", zap.Error(err))

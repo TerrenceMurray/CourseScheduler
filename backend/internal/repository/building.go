@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TerrenceMurray/course-scheduler/internal/database"
 	"github.com/TerrenceMurray/course-scheduler/internal/database/postgres/scheduler/model"
 	"github.com/TerrenceMurray/course-scheduler/internal/database/postgres/scheduler/table"
 	"github.com/TerrenceMurray/course-scheduler/internal/models"
@@ -59,7 +60,7 @@ func (b *BuildingRepository) Create(ctx context.Context, building *models.Buildi
 	).MODEL(newBuilding).RETURNING(table.Buildings.AllColumns)
 
 	var dest model.Buildings
-	err := insertStmt.QueryContext(ctx, b.db, &dest)
+	err := insertStmt.QueryContext(ctx, database.GetExecutor(ctx, b.db), &dest)
 
 	if err != nil {
 		b.logger.Error("failed to insert building", zap.Error(err))
@@ -95,7 +96,8 @@ func (b *BuildingRepository) CreateBatch(ctx context.Context, buildings []*model
 
 		insertStmt := table.Buildings.
 			INSERT(
-				table.Buildings.AllColumns,
+				table.Buildings.ID,
+				table.Buildings.Name,
 			).
 			MODEL(building).
 			RETURNING(table.Buildings.AllColumns)
@@ -123,7 +125,7 @@ func (b *BuildingRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 		WHERE(table.Buildings.ID.EQ(UUID(id)))
 
 	var dest model.Buildings
-	err := stmt.QueryContext(ctx, b.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, b.db), &dest)
 
 	if err != nil {
 		if errors.Is(err, qrm.ErrNoRows) {
@@ -142,7 +144,7 @@ func (b *BuildingRepository) List(ctx context.Context) ([]models.Building, error
 		ORDER_BY(table.Buildings.Name.ASC())
 
 	var dest []model.Buildings
-	err := stmt.QueryContext(ctx, b.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, b.db), &dest)
 
 	if err != nil {
 		b.logger.Error("failed to list buildings", zap.Error(err))
@@ -169,7 +171,7 @@ func (b *BuildingRepository) Delete(ctx context.Context, id uuid.UUID) error {
 			table.Buildings.ID.EQ(UUID(id)),
 		)
 
-	result, err := deleteStmt.ExecContext(ctx, b.db)
+	result, err := deleteStmt.ExecContext(ctx, database.GetExecutor(ctx, b.db))
 
 	if err != nil {
 		b.logger.Error("failed to delete building", zap.Error(err))
@@ -214,7 +216,7 @@ func (b *BuildingRepository) Update(ctx context.Context, id uuid.UUID, updates *
 		RETURNING(table.Buildings.AllColumns)
 
 	var dest model.Buildings
-	err := updateStmt.QueryContext(ctx, b.db, &dest)
+	err := updateStmt.QueryContext(ctx, database.GetExecutor(ctx, b.db), &dest)
 
 	if err != nil {
 		if errors.Is(err, qrm.ErrNoRows) {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TerrenceMurray/course-scheduler/internal/database"
 	"github.com/TerrenceMurray/course-scheduler/internal/database/postgres/scheduler/model"
 	"github.com/TerrenceMurray/course-scheduler/internal/database/postgres/scheduler/table"
 	"github.com/TerrenceMurray/course-scheduler/internal/models"
@@ -75,7 +76,7 @@ func (r *ScheduleRepository) Create(ctx context.Context, schedule *models.Schedu
 		RETURNING(table.Schedules.AllColumns)
 
 	var dest model.Schedules
-	if err := insertStmt.QueryContext(ctx, r.db, &dest); err != nil {
+	if err := insertStmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest); err != nil {
 		r.logger.Error("failed to create schedule", zap.Error(err))
 		return nil, fmt.Errorf("failed to create schedule: %w", err)
 	}
@@ -89,7 +90,7 @@ func (r *ScheduleRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 		WHERE(table.Schedules.ID.EQ(UUID(id)))
 
 	var dest model.Schedules
-	err := stmt.QueryContext(ctx, r.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		if errors.Is(err, qrm.ErrNoRows) {
@@ -108,7 +109,7 @@ func (r *ScheduleRepository) GetByName(ctx context.Context, name string) (*model
 		WHERE(table.Schedules.Name.EQ(String(name)))
 
 	var dest model.Schedules
-	err := stmt.QueryContext(ctx, r.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		if errors.Is(err, qrm.ErrNoRows) {
@@ -127,7 +128,7 @@ func (r *ScheduleRepository) List(ctx context.Context) ([]*models.Schedule, erro
 		ORDER_BY(table.Schedules.Name.ASC())
 
 	var dest []model.Schedules
-	err := stmt.QueryContext(ctx, r.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		r.logger.Error("failed to list schedules", zap.Error(err))
@@ -211,7 +212,7 @@ func (r *ScheduleRepository) Update(ctx context.Context, id uuid.UUID, updates *
 		RETURNING(table.Schedules.AllColumns)
 
 	var dest model.Schedules
-	err := updateStmt.QueryContext(ctx, r.db, &dest)
+	err := updateStmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		if errors.Is(err, qrm.ErrNoRows) {

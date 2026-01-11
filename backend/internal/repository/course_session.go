@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TerrenceMurray/course-scheduler/internal/database"
 	"github.com/TerrenceMurray/course-scheduler/internal/database/postgres/scheduler/model"
 	"github.com/TerrenceMurray/course-scheduler/internal/database/postgres/scheduler/table"
 	"github.com/TerrenceMurray/course-scheduler/internal/models"
@@ -50,12 +51,19 @@ func (r *CourseSessionRepository) Create(ctx context.Context, session *models.Co
 	}
 
 	insertStmt := table.CourseSessions.
-		INSERT(table.CourseSessions.AllColumns.Except(table.CourseSessions.CreatedAt, table.CourseSessions.UpdatedAt)).
+		INSERT(
+			table.CourseSessions.ID,
+			table.CourseSessions.CourseID,
+			table.CourseSessions.RequiredRoom,
+			table.CourseSessions.Type,
+			table.CourseSessions.Duration,
+			table.CourseSessions.NumberOfSessions,
+		).
 		MODEL(session).
 		RETURNING(table.CourseSessions.AllColumns)
 
 	var dest model.CourseSessions
-	if err := insertStmt.QueryContext(ctx, r.db, &dest); err != nil {
+	if err := insertStmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest); err != nil {
 		r.logger.Error("failed to create course session", zap.Error(err))
 		return nil, fmt.Errorf("failed to create course session: %w", err)
 	}
@@ -96,7 +104,14 @@ func (r *CourseSessionRepository) CreateBatch(ctx context.Context, sessions []*m
 		}
 
 		insertStmt := table.CourseSessions.
-			INSERT(table.CourseSessions.AllColumns.Except(table.CourseSessions.CreatedAt, table.CourseSessions.UpdatedAt)).
+			INSERT(
+				table.CourseSessions.ID,
+				table.CourseSessions.CourseID,
+				table.CourseSessions.RequiredRoom,
+				table.CourseSessions.Type,
+				table.CourseSessions.Duration,
+				table.CourseSessions.NumberOfSessions,
+			).
 			MODEL(session).
 			RETURNING(table.CourseSessions.AllColumns)
 
@@ -132,7 +147,7 @@ func (r *CourseSessionRepository) GetByID(ctx context.Context, id uuid.UUID) (*m
 		WHERE(table.CourseSessions.ID.EQ(UUID(id)))
 
 	var dest model.CourseSessions
-	err := stmt.QueryContext(ctx, r.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		if errors.Is(err, qrm.ErrNoRows) {
@@ -161,7 +176,7 @@ func (r *CourseSessionRepository) GetByCourseID(ctx context.Context, courseID uu
 		ORDER_BY(table.CourseSessions.Type.ASC())
 
 	var dest []model.CourseSessions
-	err := stmt.QueryContext(ctx, r.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		r.logger.Error("failed to get course sessions by course id", zap.Error(err), zap.String("course_id", courseID.String()))
@@ -191,7 +206,7 @@ func (r *CourseSessionRepository) List(ctx context.Context) ([]*models.CourseSes
 		ORDER_BY(table.CourseSessions.CourseID.ASC(), table.CourseSessions.Type.ASC())
 
 	var dest []model.CourseSessions
-	err := stmt.QueryContext(ctx, r.db, &dest)
+	err := stmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		r.logger.Error("failed to list course sessions", zap.Error(err))
@@ -273,7 +288,7 @@ func (r *CourseSessionRepository) Update(ctx context.Context, id uuid.UUID, upda
 		RETURNING(table.CourseSessions.AllColumns)
 
 	var dest model.CourseSessions
-	err := updateStmt.QueryContext(ctx, r.db, &dest)
+	err := updateStmt.QueryContext(ctx, database.GetExecutor(ctx, r.db), &dest)
 
 	if err != nil {
 		if errors.Is(err, qrm.ErrNoRows) {
