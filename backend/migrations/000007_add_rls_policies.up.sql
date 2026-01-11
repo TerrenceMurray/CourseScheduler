@@ -1,13 +1,29 @@
 -- Enable Row-Level Security on all user-owned tables
 -- Users can only see and modify their own data based on created_by column
 
+-- Grant schema and table permissions to authenticated role
+GRANT USAGE ON SCHEMA scheduler TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA scheduler TO authenticated;
+
 -- Enable RLS on all tables
+-- FORCE ensures RLS applies even to table owners
 ALTER TABLE scheduler.room_types ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scheduler.room_types FORCE ROW LEVEL SECURITY;
+
 ALTER TABLE scheduler.buildings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scheduler.buildings FORCE ROW LEVEL SECURITY;
+
 ALTER TABLE scheduler.rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scheduler.rooms FORCE ROW LEVEL SECURITY;
+
 ALTER TABLE scheduler.courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scheduler.courses FORCE ROW LEVEL SECURITY;
+
 ALTER TABLE scheduler.course_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scheduler.course_sessions FORCE ROW LEVEL SECURITY;
+
 ALTER TABLE scheduler.schedules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scheduler.schedules FORCE ROW LEVEL SECURITY;
 
 -- Room Types policies
 CREATE POLICY room_types_select_policy ON scheduler.room_types

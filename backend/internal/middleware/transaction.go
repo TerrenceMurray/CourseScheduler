@@ -19,6 +19,15 @@ func TransactionMiddleware(db *sql.DB) func(http.Handler) http.Handler {
 
 			userID := GetUserID(r.Context())
 			if userID != "" {
+				// Switch to authenticated role so RLS policies apply
+				// Superusers bypass RLS, so we need to use a non-superuser role
+				_, err = tx.ExecContext(r.Context(), "SET LOCAL ROLE authenticated")
+				if err != nil {
+					tx.Rollback()
+					http.Error(w, "failed to set role", http.StatusInternalServerError)
+					return
+				}
+
 				// Use set_config() instead of SET LOCAL for custom GUC variables
 				// Third parameter (is_local) = true means it only applies to current transaction
 				_, err = tx.ExecContext(r.Context(), "SELECT set_config('app.current_user_id', $1, true)", userID)

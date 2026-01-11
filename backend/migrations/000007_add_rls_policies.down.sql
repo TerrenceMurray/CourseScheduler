@@ -36,10 +36,25 @@ DROP POLICY IF EXISTS schedules_insert_policy ON scheduler.schedules;
 DROP POLICY IF EXISTS schedules_update_policy ON scheduler.schedules;
 DROP POLICY IF EXISTS schedules_delete_policy ON scheduler.schedules;
 
--- Disable RLS on all tables
+-- Disable RLS on all tables (NO FORCE then DISABLE)
+ALTER TABLE scheduler.room_types NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE scheduler.room_types DISABLE ROW LEVEL SECURITY;
+
+ALTER TABLE scheduler.buildings NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE scheduler.buildings DISABLE ROW LEVEL SECURITY;
+
+ALTER TABLE scheduler.rooms NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE scheduler.rooms DISABLE ROW LEVEL SECURITY;
+
+ALTER TABLE scheduler.courses NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE scheduler.courses DISABLE ROW LEVEL SECURITY;
+
+ALTER TABLE scheduler.course_sessions NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE scheduler.course_sessions DISABLE ROW LEVEL SECURITY;
+
+ALTER TABLE scheduler.schedules NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE scheduler.schedules DISABLE ROW LEVEL SECURITY;
+
+-- Revoke permissions from authenticated role
+REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA scheduler FROM authenticated;
+REVOKE USAGE ON SCHEMA scheduler FROM authenticated;

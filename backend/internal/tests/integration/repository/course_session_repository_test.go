@@ -28,6 +28,12 @@ func (s *CourseSessionRepositorySuite) SetupSuite() {
 	s.repo = repository.NewCourseSessionRepository(s.testDB.DB, s.testDB.Logger)
 	s.courseRepo = repository.NewCourseRepository(s.testDB.DB, s.testDB.Logger)
 	s.roomTypeRepo = repository.NewRoomTypeRepository(s.testDB.DB, s.testDB.Logger)
+
+	// Setup test user context for RLS and created_by trigger
+	_, err := s.testDB.SetupTestUserContext()
+	if err != nil {
+		s.T().Fatalf("failed to setup test user context: %v", err)
+	}
 }
 
 func (s *CourseSessionRepositorySuite) SetupTest() {
