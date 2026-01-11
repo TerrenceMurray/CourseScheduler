@@ -20,6 +20,7 @@ type roomTypesTable struct {
 	Name      postgres.ColumnString
 	CreatedAt postgres.ColumnTimestamp
 	UpdatedAt postgres.ColumnTimestamp
+	CreatedBy postgres.ColumnString
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -64,8 +65,9 @@ func newRoomTypesTableImpl(schemaName, tableName, alias string) roomTypesTable {
 		NameColumn      = postgres.StringColumn("name")
 		CreatedAtColumn = postgres.TimestampColumn("created_at")
 		UpdatedAtColumn = postgres.TimestampColumn("updated_at")
-		allColumns      = postgres.ColumnList{NameColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns  = postgres.ColumnList{CreatedAtColumn, UpdatedAtColumn}
+		CreatedByColumn = postgres.StringColumn("created_by")
+		allColumns      = postgres.ColumnList{NameColumn, CreatedAtColumn, UpdatedAtColumn, CreatedByColumn}
+		mutableColumns  = postgres.ColumnList{CreatedAtColumn, UpdatedAtColumn, CreatedByColumn}
 		defaultColumns  = postgres.ColumnList{CreatedAtColumn}
 	)
 
@@ -76,6 +78,7 @@ func newRoomTypesTableImpl(schemaName, tableName, alias string) roomTypesTable {
 		Name:      NameColumn,
 		CreatedAt: CreatedAtColumn,
 		UpdatedAt: UpdatedAtColumn,
+		CreatedBy: CreatedByColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

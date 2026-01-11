@@ -8,6 +8,7 @@
 package model
 
 import (
+	"github.com/google/uuid"
 	"time"
 )
 
@@ -15,4 +16,5 @@ type RoomTypes struct {
 	Name      string `sql:"primary_key"`
 	CreatedAt *time.Time
 	UpdatedAt *time.Time
+	CreatedBy uuid.UUID
 }

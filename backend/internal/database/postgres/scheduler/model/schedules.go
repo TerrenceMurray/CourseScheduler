@@ -14,8 +14,11 @@ import (
 
 // Stores the output of the scheduling algorithm
 type Schedules struct {
-	ID        uuid.UUID `sql:"primary_key"`
-	Name      *string   // Schedule identifier (e.g., Fall 2025 Schedule)
-	CreatedAt *time.Time
-	Sessions  string // JSONB array: [{course_id, room_id, day (0-6), start_time (mins), end_time (mins)}, ...]
+	ID         uuid.UUID `sql:"primary_key"`
+	Name       *string   // Schedule identifier (e.g., Fall 2025 Schedule)
+	CreatedAt  *time.Time
+	Sessions   string // JSONB array: [{course_id, room_id, day (0-6), start_time (mins), end_time (mins)}, ...]
+	IsArchived *bool
+	IsActive   *bool
+	CreatedBy  uuid.UUID
 }

@@ -22,4 +22,5 @@ type CourseSessions struct {
 	NumberOfSessions *int32            // How many times per week this session occurs
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
+	CreatedBy        uuid.UUID
 }

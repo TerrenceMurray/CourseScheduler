@@ -17,4 +17,5 @@ type Buildings struct {
 	Name      string
 	CreatedAt *time.Time
 	UpdatedAt *time.Time
+	CreatedBy uuid.UUID
 }

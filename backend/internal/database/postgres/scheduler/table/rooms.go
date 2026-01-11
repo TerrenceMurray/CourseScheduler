@@ -24,6 +24,7 @@ type roomsTable struct {
 	Capacity  postgres.ColumnInteger
 	CreatedAt postgres.ColumnTimestamp
 	UpdatedAt postgres.ColumnTimestamp
+	CreatedBy postgres.ColumnString
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -72,8 +73,9 @@ func newRoomsTableImpl(schemaName, tableName, alias string) roomsTable {
 		CapacityColumn  = postgres.IntegerColumn("capacity")
 		CreatedAtColumn = postgres.TimestampColumn("created_at")
 		UpdatedAtColumn = postgres.TimestampColumn("updated_at")
-		allColumns      = postgres.ColumnList{IDColumn, NameColumn, TypeColumn, BuildingColumn, CapacityColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns  = postgres.ColumnList{NameColumn, TypeColumn, BuildingColumn, CapacityColumn, CreatedAtColumn, UpdatedAtColumn}
+		CreatedByColumn = postgres.StringColumn("created_by")
+		allColumns      = postgres.ColumnList{IDColumn, NameColumn, TypeColumn, BuildingColumn, CapacityColumn, CreatedAtColumn, UpdatedAtColumn, CreatedByColumn}
+		mutableColumns  = postgres.ColumnList{NameColumn, TypeColumn, BuildingColumn, CapacityColumn, CreatedAtColumn, UpdatedAtColumn, CreatedByColumn}
 		defaultColumns  = postgres.ColumnList{CreatedAtColumn}
 	)
 
@@ -88,6 +90,7 @@ func newRoomsTableImpl(schemaName, tableName, alias string) roomsTable {
 		Capacity:  CapacityColumn,
 		CreatedAt: CreatedAtColumn,
 		UpdatedAt: UpdatedAtColumn,
+		CreatedBy: CreatedByColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

@@ -20,4 +20,5 @@ type Rooms struct {
 	Capacity  int32
 	CreatedAt *time.Time
 	UpdatedAt *time.Time
+	CreatedBy uuid.UUID
 }

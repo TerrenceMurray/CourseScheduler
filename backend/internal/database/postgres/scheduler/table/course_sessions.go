@@ -26,6 +26,7 @@ type courseSessionsTable struct {
 	NumberOfSessions postgres.ColumnInteger // How many times per week this session occurs
 	CreatedAt        postgres.ColumnTimestamp
 	UpdatedAt        postgres.ColumnTimestamp
+	CreatedBy        postgres.ColumnString
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -75,8 +76,9 @@ func newCourseSessionsTableImpl(schemaName, tableName, alias string) courseSessi
 		NumberOfSessionsColumn = postgres.IntegerColumn("number_of_sessions")
 		CreatedAtColumn        = postgres.TimestampColumn("created_at")
 		UpdatedAtColumn        = postgres.TimestampColumn("updated_at")
-		allColumns             = postgres.ColumnList{IDColumn, CourseIDColumn, RequiredRoomColumn, TypeColumn, DurationColumn, NumberOfSessionsColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns         = postgres.ColumnList{CourseIDColumn, RequiredRoomColumn, TypeColumn, DurationColumn, NumberOfSessionsColumn, CreatedAtColumn, UpdatedAtColumn}
+		CreatedByColumn        = postgres.StringColumn("created_by")
+		allColumns             = postgres.ColumnList{IDColumn, CourseIDColumn, RequiredRoomColumn, TypeColumn, DurationColumn, NumberOfSessionsColumn, CreatedAtColumn, UpdatedAtColumn, CreatedByColumn}
+		mutableColumns         = postgres.ColumnList{CourseIDColumn, RequiredRoomColumn, TypeColumn, DurationColumn, NumberOfSessionsColumn, CreatedAtColumn, UpdatedAtColumn, CreatedByColumn}
 		defaultColumns         = postgres.ColumnList{CreatedAtColumn}
 	)
 
@@ -92,6 +94,7 @@ func newCourseSessionsTableImpl(schemaName, tableName, alias string) courseSessi
 		NumberOfSessions: NumberOfSessionsColumn,
 		CreatedAt:        CreatedAtColumn,
 		UpdatedAt:        UpdatedAtColumn,
+		CreatedBy:        CreatedByColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

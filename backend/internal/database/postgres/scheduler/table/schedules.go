@@ -18,10 +18,13 @@ type schedulesTable struct {
 	postgres.Table
 
 	// Columns
-	ID        postgres.ColumnString
-	Name      postgres.ColumnString // Schedule identifier (e.g., Fall 2025 Schedule)
-	CreatedAt postgres.ColumnTimestamp
-	Sessions  postgres.ColumnString // JSONB array: [{course_id, room_id, day (0-6), start_time (mins), end_time (mins)}, ...]
+	ID         postgres.ColumnString
+	Name       postgres.ColumnString // Schedule identifier (e.g., Fall 2025 Schedule)
+	CreatedAt  postgres.ColumnTimestamp
+	Sessions   postgres.ColumnString // JSONB array: [{course_id, room_id, day (0-6), start_time (mins), end_time (mins)}, ...]
+	IsArchived postgres.ColumnBool
+	IsActive   postgres.ColumnBool
+	CreatedBy  postgres.ColumnString
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -63,23 +66,29 @@ func newSchedulesTable(schemaName, tableName, alias string) *SchedulesTable {
 
 func newSchedulesTableImpl(schemaName, tableName, alias string) schedulesTable {
 	var (
-		IDColumn        = postgres.StringColumn("id")
-		NameColumn      = postgres.StringColumn("name")
-		CreatedAtColumn = postgres.TimestampColumn("created_at")
-		SessionsColumn  = postgres.StringColumn("sessions")
-		allColumns      = postgres.ColumnList{IDColumn, NameColumn, CreatedAtColumn, SessionsColumn}
-		mutableColumns  = postgres.ColumnList{NameColumn, CreatedAtColumn, SessionsColumn}
-		defaultColumns  = postgres.ColumnList{CreatedAtColumn}
+		IDColumn         = postgres.StringColumn("id")
+		NameColumn       = postgres.StringColumn("name")
+		CreatedAtColumn  = postgres.TimestampColumn("created_at")
+		SessionsColumn   = postgres.StringColumn("sessions")
+		IsArchivedColumn = postgres.BoolColumn("is_archived")
+		IsActiveColumn   = postgres.BoolColumn("is_active")
+		CreatedByColumn  = postgres.StringColumn("created_by")
+		allColumns       = postgres.ColumnList{IDColumn, NameColumn, CreatedAtColumn, SessionsColumn, IsArchivedColumn, IsActiveColumn, CreatedByColumn}
+		mutableColumns   = postgres.ColumnList{NameColumn, CreatedAtColumn, SessionsColumn, IsArchivedColumn, IsActiveColumn, CreatedByColumn}
+		defaultColumns   = postgres.ColumnList{CreatedAtColumn, IsArchivedColumn, IsActiveColumn}
 	)
 
 	return schedulesTable{
 		Table: postgres.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		ID:        IDColumn,
-		Name:      NameColumn,
-		CreatedAt: CreatedAtColumn,
-		Sessions:  SessionsColumn,
+		ID:         IDColumn,
+		Name:       NameColumn,
+		CreatedAt:  CreatedAtColumn,
+		Sessions:   SessionsColumn,
+		IsArchived: IsArchivedColumn,
+		IsActive:   IsActiveColumn,
+		CreatedBy:  CreatedByColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,
