@@ -1,5 +1,10 @@
 {
     "cSpell.words": [
-        "dayofweek"
+        "basicauth",
+        "dayofweek",
+        "letsencrypt",
+        "redirections",
+        "traefik",
+        "VITE"
     ]
 }

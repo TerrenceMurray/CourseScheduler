@@ -1,6 +1,8 @@
 package app
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 
 	"github.com/TerrenceMurray/course-scheduler/internal/handlers"
@@ -17,6 +19,13 @@ func (a *App) setupRoutes() {
 	roomTypeHandler := handlers.NewRoomTypeHandler(a.RoomTypeService)
 	scheduleHandler := handlers.NewScheduleHandler(a.ScheduleService)
 	schedulerHandler := handlers.NewSchedulerHandler(a.SchedulerService)
+
+	// Health check endpoint (no auth required)
+	a.Router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+	})
 
 	a.Router.Route("/api/v1", func(r chi.Router) {
 
