@@ -17,7 +17,7 @@
     "test:frontend": "cd frontend && pnpm test",
     "db:migrate": "task migrate:up",
     "db:rollback": "task migrate:down",
-    "db:new": "task schema-new --",
+    "db:new": "task schema:new --",
     "db:generate-types": "task jet:gen"
   },
   "keywords": [
