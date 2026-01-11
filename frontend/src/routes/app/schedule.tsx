@@ -263,14 +263,6 @@ function SchedulePage() {
     return { gridStartHour: earliest, gridEndHour: latest, hours }
   }, [sessions])
 
-  const handleExport = (format: string) => {
-    console.log(`Exporting as ${format}`)
-  }
-
-  const handlePrint = () => {
-    window.print()
-  }
-
   const toggleCourseVisibility = (courseName: string) => {
     setHiddenCourses(prev => {
       const newSet = new Set(prev)
@@ -455,6 +447,431 @@ function SchedulePage() {
   const nextSession = getNextSession()
   const currentSession = sessions.find(s => isSessionNow(s))
 
+  // Export functions
+  const handleExport = (format: 'csv' | 'ics' | 'pdf') => {
+    if (!currentSchedule || sessions.length === 0) return
+
+    switch (format) {
+      case 'csv':
+        exportAsCSV()
+        break
+      case 'ics':
+        exportAsICS()
+        break
+      case 'pdf':
+        exportAsPDF()
+        break
+    }
+  }
+
+  const exportAsCSV = () => {
+    const headers = ['Course', 'Day', 'Start Time', 'End Time', 'Duration (hours)', 'Room', 'Building', 'Capacity']
+    const rows = sessions.map(s => [
+      s.course,
+      s.day,
+      formatHour(s.startHour),
+      formatHour(s.startHour + s.duration),
+      s.duration.toString(),
+      s.room,
+      s.building,
+      s.capacity.toString()
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n')
+
+    downloadFile(csvContent, `${currentSchedule?.name || 'schedule'}.csv`, 'text/csv')
+  }
+
+  const exportAsICS = () => {
+    // Generate ICS calendar file
+    // Using a recurring weekly event for each session
+    const now = new Date()
+    const startOfWeek = new Date(now)
+    startOfWeek.setDate(now.getDate() - now.getDay() + 1) // Monday
+
+    const formatICSDate = (date: Date) => {
+      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+    }
+
+    const events = sessions.map((s, index) => {
+      // Calculate the date for this session's day this week
+      const sessionDate = new Date(startOfWeek)
+      sessionDate.setDate(startOfWeek.getDate() + s.dayIndex)
+
+      // Set start time
+      const startHours = Math.floor(s.startHour)
+      const startMinutes = Math.round((s.startHour - startHours) * 60)
+      const startDate = new Date(sessionDate)
+      startDate.setHours(startHours, startMinutes, 0, 0)
+
+      // Set end time
+      const endHour = s.startHour + s.duration
+      const endHours = Math.floor(endHour)
+      const endMinutes = Math.round((endHour - endHours) * 60)
+      const endDate = new Date(sessionDate)
+      endDate.setHours(endHours, endMinutes, 0, 0)
+
+      return `BEGIN:VEVENT
+UID:${s.id}-${index}@course-scheduler
+DTSTAMP:${formatICSDate(now)}
+DTSTART:${formatICSDate(startDate)}
+DTEND:${formatICSDate(endDate)}
+RRULE:FREQ=WEEKLY
+SUMMARY:${s.course}
+LOCATION:${s.room}, ${s.building}
+DESCRIPTION:Course: ${s.course}\\nRoom: ${s.room}\\nBuilding: ${s.building}\\nCapacity: ${s.capacity} seats
+END:VEVENT`
+    })
+
+    const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Course Scheduler//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:${currentSchedule?.name || 'Schedule'}
+${events.join('\n')}
+END:VCALENDAR`
+
+    downloadFile(icsContent, `${currentSchedule?.name || 'schedule'}.ics`, 'text/calendar')
+  }
+
+  const exportAsPDF = () => {
+    // Create a printable HTML document and use browser's print to PDF
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      alert('Please allow pop-ups to export PDF')
+      return
+    }
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>${currentSchedule?.name || 'Schedule'}</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; max-width: 1000px; margin: 0 auto; }
+    h1 { margin-bottom: 8px; }
+    .subtitle { color: #666; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    tr:nth-child(even) { background: #fafafa; }
+    .stats { display: flex; gap: 24px; margin-bottom: 20px; padding: 16px; background: #f5f5f5; border-radius: 8px; }
+    .stat { }
+    .stat-value { font-size: 24px; font-weight: 600; }
+    .stat-label { color: #666; font-size: 14px; }
+    @media print {
+      body { padding: 20px; }
+      button { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <h1>${currentSchedule?.name || 'Schedule'}</h1>
+  <p class="subtitle">Generated on ${new Date().toLocaleDateString()}</p>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value">${sessions.length}</div>
+      <div class="stat-label">Classes</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${uniqueCourses.length}</div>
+      <div class="stat-label">Courses</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${totalHours}h</div>
+      <div class="stat-label">Weekly Hours</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Day</th>
+        <th>Time</th>
+        <th>Course</th>
+        <th>Room</th>
+        <th>Building</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${sessions
+        .sort((a, b) => a.dayIndex - b.dayIndex || a.startHour - b.startHour)
+        .map(s => `
+          <tr>
+            <td>${s.day}</td>
+            <td>${formatHour(s.startHour)} - ${formatHour(s.startHour + s.duration)}</td>
+            <td>${s.course}</td>
+            <td>${s.room}</td>
+            <td>${s.building}</td>
+          </tr>
+        `).join('')}
+    </tbody>
+  </table>
+
+  <script>
+    window.onload = function() { window.print(); }
+  </script>
+</body>
+</html>`
+
+    printWindow.document.write(html)
+    printWindow.document.close()
+  }
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      alert('Please allow pop-ups to print')
+      return
+    }
+
+    // Group sessions by day for a cleaner layout
+    const sessionsByDay = days.map(day => ({
+      day,
+      sessions: sessions
+        .filter(s => s.day === day)
+        .sort((a, b) => a.startHour - b.startHour)
+    }))
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>${currentSchedule?.name || 'Schedule'} - Print</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 32px;
+      max-width: 1100px;
+      margin: 0 auto;
+      color: #1a1a1a;
+      line-height: 1.4;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #e5e5e5;
+    }
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { color: #666; font-size: 13px; }
+    .stats {
+      display: flex;
+      gap: 20px;
+      text-align: right;
+    }
+    .stat-value { font-size: 22px; font-weight: 700; color: #1a1a1a; }
+    .stat-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .week-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .day-column {
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .day-header {
+      background: #f8f8f8;
+      padding: 10px 12px;
+      font-weight: 600;
+      font-size: 13px;
+      border-bottom: 1px solid #e5e5e5;
+      text-align: center;
+    }
+    .day-sessions {
+      padding: 8px;
+      min-height: 200px;
+    }
+    .session-card {
+      background: #f5f5f5;
+      border-left: 3px solid #3b82f6;
+      border-radius: 4px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      font-size: 11px;
+    }
+    .session-card:last-child { margin-bottom: 0; }
+    .session-course {
+      font-weight: 600;
+      font-size: 12px;
+      margin-bottom: 4px;
+      color: #1a1a1a;
+    }
+    .session-time {
+      color: #666;
+      margin-bottom: 2px;
+    }
+    .session-room {
+      color: #888;
+      font-size: 10px;
+    }
+    .no-sessions {
+      color: #ccc;
+      font-size: 11px;
+      text-align: center;
+      padding: 20px 10px;
+    }
+
+    .table-view {
+      margin-top: 32px;
+      page-break-before: always;
+    }
+    .table-view h2 {
+      font-size: 18px;
+      margin-bottom: 12px;
+      color: #333;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px 10px;
+      text-align: left;
+    }
+    th {
+      background: #f5f5f5;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      color: #555;
+    }
+    tr:nth-child(even) { background: #fafafa; }
+    tr:hover { background: #f0f0f0; }
+
+    .footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e5e5;
+      font-size: 11px;
+      color: #888;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    @media print {
+      body { padding: 16px; }
+      .week-grid { gap: 8px; }
+      .day-column { break-inside: avoid; }
+      .session-card { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>${currentSchedule?.name || 'Schedule'}</h1>
+      <p class="subtitle">Weekly Timetable</p>
+    </div>
+    <div class="stats">
+      <div>
+        <div class="stat-value">${sessions.length}</div>
+        <div class="stat-label">Classes</div>
+      </div>
+      <div>
+        <div class="stat-value">${uniqueCourses.length}</div>
+        <div class="stat-label">Courses</div>
+      </div>
+      <div>
+        <div class="stat-value">${totalHours}h</div>
+        <div class="stat-label">Weekly</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="week-grid">
+    ${sessionsByDay.map(({ day, sessions: daySessions }) => `
+      <div class="day-column">
+        <div class="day-header">${day}</div>
+        <div class="day-sessions">
+          ${daySessions.length === 0
+            ? '<div class="no-sessions">No classes</div>'
+            : daySessions.map(s => `
+              <div class="session-card">
+                <div class="session-course">${s.course}</div>
+                <div class="session-time">${formatHour(s.startHour)} - ${formatHour(s.startHour + s.duration)}</div>
+                <div class="session-room">${s.room} · ${s.building}</div>
+              </div>
+            `).join('')}
+        </div>
+      </div>
+    `).join('')}
+  </div>
+
+  <div class="table-view">
+    <h2>Detailed Schedule</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Day</th>
+          <th>Time</th>
+          <th>Duration</th>
+          <th>Course</th>
+          <th>Room</th>
+          <th>Building</th>
+          <th>Capacity</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${sessions
+          .sort((a, b) => a.dayIndex - b.dayIndex || a.startHour - b.startHour)
+          .map(s => `
+            <tr>
+              <td>${s.day}</td>
+              <td>${formatHour(s.startHour)} - ${formatHour(s.startHour + s.duration)}</td>
+              <td>${formatDuration(s.duration)}</td>
+              <td><strong>${s.course}</strong></td>
+              <td>${s.room}</td>
+              <td>${s.building}</td>
+              <td>${s.capacity} seats</td>
+            </tr>
+          `).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <span>Generated from Course Scheduler</span>
+    <span>${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+  </div>
+
+  <script>
+    window.onload = function() { window.print(); }
+  </script>
+</body>
+</html>`
+
+    printWindow.document.write(html)
+    printWindow.document.close()
+  }
+
+  const downloadFile = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <TooltipProvider>
       <div className="flex flex-1 flex-col gap-4 animate-fade-in">
@@ -538,10 +955,10 @@ function SchedulePage() {
             {/* Archived Schedules Sheet */}
             <Sheet open={archivedSheetOpen} onOpenChange={setArchivedSheetOpen}>
               <SheetTrigger asChild>
-                <Button variant="outline" size="icon">
+                <Button variant="outline" size="icon" className="relative">
                   <Archive className="size-4" />
                   {archivedSchedules.length > 0 && (
-                    <span className="absolute -top-1 -right-1 size-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center">
+                    <span className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center">
                       {archivedSchedules.length}
                     </span>
                   )}

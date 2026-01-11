@@ -8,9 +8,6 @@ import {
   Shield,
   Key,
   Check,
-  Globe,
-  Clock,
-  Calendar,
   Palette,
   Save,
   Loader2,
@@ -44,8 +41,6 @@ const sections = [
   { id: 'security', label: 'Security', icon: Shield },
 ]
 
-const PREFERENCES_KEY = 'course-scheduler-preferences'
-
 function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const { user } = useAuth()
@@ -69,28 +64,6 @@ function SettingsPage() {
   const [profile, setProfile] = useState({
     name: userName,
     department: user?.user_metadata?.department || '',
-  })
-
-  // Load preferences from localStorage
-  const [preferences, setPreferences] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(PREFERENCES_KEY)
-      if (saved) {
-        try {
-          return JSON.parse(saved)
-        } catch {
-          // ignore
-        }
-      }
-    }
-    return {
-      language: 'en',
-      timezone: 'America/New_York',
-      dateFormat: 'MM/DD/YYYY',
-      timeFormat: '12h',
-      defaultView: 'week',
-      startOfWeek: 'monday',
-    }
   })
 
   // Update profile when user changes
@@ -123,11 +96,6 @@ function SettingsPage() {
     } finally {
       setSaving(false)
     }
-  }
-
-  const handleSavePreferences = () => {
-    localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences))
-    toast.success('Preferences saved')
   }
 
   const handleChangePassword = async () => {
@@ -299,187 +267,57 @@ function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
-
-              <Card>
-                <CardHeader className="pb-4 space-y-1">
-                  <CardTitle className="text-base">Regional Preferences</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    Language, timezone, and formatting options
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Globe className="size-3.5 text-muted-foreground" />
-                        Language
-                      </Label>
-                      <Select value={preferences.language} onValueChange={(v) => setPreferences({ ...preferences, language: v })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="en">English</SelectItem>
-                          <SelectItem value="es">Español</SelectItem>
-                          <SelectItem value="fr">Français</SelectItem>
-                          <SelectItem value="de">Deutsch</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Clock className="size-3.5 text-muted-foreground" />
-                        Timezone
-                      </Label>
-                      <Select value={preferences.timezone} onValueChange={(v) => setPreferences({ ...preferences, timezone: v })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
-                          <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
-                          <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
-                          <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
-                          <SelectItem value="Europe/London">London (GMT)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Date Format</Label>
-                      <Select value={preferences.dateFormat} onValueChange={(v) => setPreferences({ ...preferences, dateFormat: v })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
-                          <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
-                          <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Time Format</Label>
-                      <Select value={preferences.timeFormat} onValueChange={(v) => setPreferences({ ...preferences, timeFormat: v })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="12h">12-hour (1:30 PM)</SelectItem>
-                          <SelectItem value="24h">24-hour (13:30)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="flex justify-end">
-                <Button onClick={handleSavePreferences} className="w-full sm:w-auto">
-                  <Save className="mr-2 size-4" />
-                  Save Preferences
-                </Button>
-              </div>
             </>
           )}
 
           {/* Appearance Section */}
           {activeSection === 'appearance' && (
-            <>
-              <Card>
-                <CardHeader className="pb-4 space-y-1">
-                  <CardTitle className="text-base">Theme</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    Choose how the application looks
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
-                    {[
-                      { value: 'light', label: 'Light', icon: Sun, desc: 'Always light' },
-                      { value: 'dark', label: 'Dark', icon: Moon, desc: 'Always dark' },
-                      { value: 'system', label: 'System', icon: Monitor, desc: 'Match device' },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => setTheme(option.value as 'light' | 'dark' | 'system')}
-                        className={cn(
-                          "group relative flex items-center gap-3 rounded-xl border p-3 sm:p-4 text-left transition-all",
-                          theme === option.value
-                            ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-                            : "border-border hover:border-primary/50 hover:bg-muted/50"
-                        )}
-                      >
-                        <div className={cn(
-                          "flex size-9 sm:size-10 items-center justify-center rounded-lg transition-colors shrink-0",
-                          theme === option.value
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground group-hover:bg-muted-foreground/10"
-                        )}>
-                          <option.icon className="size-4 sm:size-5" />
+            <Card>
+              <CardHeader className="pb-4 space-y-1">
+                <CardTitle className="text-base">Theme</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Choose how the application looks
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+                  {[
+                    { value: 'light', label: 'Light', icon: Sun, desc: 'Always light' },
+                    { value: 'dark', label: 'Dark', icon: Moon, desc: 'Always dark' },
+                    { value: 'system', label: 'System', icon: Monitor, desc: 'Match device' },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setTheme(option.value as 'light' | 'dark' | 'system')}
+                      className={cn(
+                        "group relative flex items-center gap-3 rounded-xl border p-3 sm:p-4 text-left transition-all",
+                        theme === option.value
+                          ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                          : "border-border hover:border-primary/50 hover:bg-muted/50"
+                      )}
+                    >
+                      <div className={cn(
+                        "flex size-9 sm:size-10 items-center justify-center rounded-lg transition-colors shrink-0",
+                        theme === option.value
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground group-hover:bg-muted-foreground/10"
+                      )}>
+                        <option.icon className="size-4 sm:size-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{option.label}</p>
+                        <p className="text-xs text-muted-foreground">{option.desc}</p>
+                      </div>
+                      {theme === option.value && (
+                        <div className="flex size-5 items-center justify-center rounded-full bg-primary shrink-0">
+                          <Check className="size-3 text-primary-foreground" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">{option.label}</p>
-                          <p className="text-xs text-muted-foreground">{option.desc}</p>
-                        </div>
-                        {theme === option.value && (
-                          <div className="flex size-5 items-center justify-center rounded-full bg-primary shrink-0">
-                            <Check className="size-3 text-primary-foreground" />
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-4 space-y-1">
-                  <CardTitle className="text-base">Schedule Display</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    Default view settings for the timetable
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Calendar className="size-3.5 text-muted-foreground" />
-                        Default View
-                      </Label>
-                      <Select value={preferences.defaultView} onValueChange={(v) => setPreferences({ ...preferences, defaultView: v })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="week">Week View</SelectItem>
-                          <SelectItem value="room">By Room</SelectItem>
-                          <SelectItem value="course">By Course</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Week Starts On</Label>
-                      <Select value={preferences.startOfWeek} onValueChange={(v) => setPreferences({ ...preferences, startOfWeek: v })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sunday">Sunday</SelectItem>
-                          <SelectItem value="monday">Monday</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="flex justify-end">
-                <Button onClick={handleSavePreferences} className="w-full sm:w-auto">
-                  <Save className="mr-2 size-4" />
-                  Save Preferences
-                </Button>
-              </div>
-            </>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Security Section */}
