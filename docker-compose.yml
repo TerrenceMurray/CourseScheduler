@@ -9,6 +9,8 @@ services:
       - CORS_ORIGIN=${CORS_ORIGIN}
     expose:
       - "8080"
+    networks:
+      - dokploy-network
     restart: unless-stopped
 
   frontend:
@@ -20,6 +22,12 @@ services:
         - VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=${VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY}
     expose:
       - "3000"
+    networks:
+      - dokploy-network
     depends_on:
       - backend
     restart: unless-stopped
+
+networks:
+  dokploy-network:
+    external: true
