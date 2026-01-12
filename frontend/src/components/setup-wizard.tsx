@@ -104,26 +104,26 @@ export function SetupWizard({
       <Card className="border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 to-emerald-600/5">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-emerald-500/10 p-2">
+            <div className="rounded-full bg-emerald-500/10 p-2 shrink-0">
               <Check className="size-5 text-emerald-500" />
             </div>
-            <div>
+            <div className="min-w-0">
               <CardTitle className="text-lg">Setup Complete!</CardTitle>
               <CardDescription>You're ready to generate your first schedule</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4">
-            <div className="flex-1 grid grid-cols-4 gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-2">
               {steps.map((step) => (
                 <div key={step.id} className="text-center p-2 rounded-lg bg-background/50">
                   <p className="text-lg font-bold">{step.count}</p>
-                  <p className="text-xs text-muted-foreground">{step.title.replace('Add ', '').replace('Create ', '').replace('Define ', '')}</p>
+                  <p className="text-xs text-muted-foreground truncate">{step.title.replace('Add ', '').replace('Create ', '').replace('Define ', '')}</p>
                 </div>
               ))}
             </div>
-            <Button asChild size="lg">
+            <Button asChild size="lg" className="w-full sm:w-auto shrink-0">
               <Link to="/app/generate">
                 <Sparkles className="mr-2 size-4" />
                 Generate Schedule
@@ -138,14 +138,14 @@ export function SetupWizard({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <CardTitle className="text-lg">Get Started</CardTitle>
             <CardDescription>Complete these steps to generate your schedule</CardDescription>
           </div>
-          <div className="text-right">
-            <p className="text-sm font-medium">{completedSteps} of {steps.length} complete</p>
-            <Progress value={progress} className="w-32 h-2 mt-1" />
+          <div className="flex items-center gap-3 sm:text-right">
+            <Progress value={progress} className="w-24 sm:w-32 h-2" />
+            <p className="text-sm font-medium whitespace-nowrap">{completedSteps}/{steps.length}</p>
           </div>
         </div>
       </CardHeader>
@@ -159,7 +159,7 @@ export function SetupWizard({
               <div
                 key={step.id}
                 className={cn(
-                  "flex items-center gap-4 p-3 rounded-lg transition-colors",
+                  "flex items-start sm:items-center gap-3 p-3 rounded-lg transition-colors",
                   status === 'complete' && "bg-emerald-500/5",
                   status === 'current' && "bg-primary/5 ring-1 ring-primary/20",
                   status === 'upcoming' && "bg-muted/30",
@@ -168,7 +168,7 @@ export function SetupWizard({
               >
                 {/* Step Number/Check */}
                 <div className={cn(
-                  "flex items-center justify-center size-8 rounded-full text-sm font-medium shrink-0",
+                  "flex items-center justify-center size-7 sm:size-8 rounded-full text-sm font-medium shrink-0",
                   status === 'complete' && "bg-emerald-500 text-white",
                   status === 'current' && "bg-primary text-primary-foreground",
                   status === 'upcoming' && "bg-muted text-muted-foreground",
@@ -181,9 +181,9 @@ export function SetupWizard({
                   )}
                 </div>
 
-                {/* Icon */}
+                {/* Icon - hidden on mobile to save space */}
                 <div className={cn(
-                  "rounded-lg p-2 shrink-0",
+                  "rounded-lg p-2 shrink-0 hidden sm:block",
                   status === 'complete' && "bg-emerald-500/10 text-emerald-500",
                   status === 'current' && "bg-primary/10 text-primary",
                   status === 'upcoming' && "bg-muted text-muted-foreground",
@@ -194,7 +194,7 @@ export function SetupWizard({
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <p className={cn(
                       "font-medium text-sm",
                       status === 'locked' && "text-muted-foreground"
@@ -203,11 +203,11 @@ export function SetupWizard({
                     </p>
                     {step.count > 0 && (
                       <span className="text-xs text-muted-foreground">
-                        ({step.count} added)
+                        ({step.count})
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">
+                  <p className="text-xs text-muted-foreground line-clamp-1 sm:truncate">
                     {status === 'locked'
                       ? `Complete "${steps.find(s => s.id === step.dependsOn)?.title}" first`
                       : step.description
@@ -220,11 +220,12 @@ export function SetupWizard({
                   <Button
                     variant={status === 'current' ? 'default' : 'ghost'}
                     size="sm"
+                    className="shrink-0"
                     asChild
                   >
                     <Link to={step.href}>
-                      {status === 'complete' ? 'Manage' : 'Start'}
-                      <ArrowRight className="ml-1 size-3" />
+                      <span className="hidden sm:inline">{status === 'complete' ? 'Manage' : 'Start'}</span>
+                      <ArrowRight className="size-4 sm:ml-1 sm:size-3" />
                     </Link>
                   </Button>
                 )}

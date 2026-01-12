@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Loader2, AlertCircle } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
@@ -145,9 +146,8 @@ export default function SignUpForm() {
 
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           placeholder="Create a password (min. 6 characters)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -155,6 +155,7 @@ export default function SignUpForm() {
           disabled={loading}
           minLength={6}
           className="h-11"
+          showStrength
         />
       </div>
 

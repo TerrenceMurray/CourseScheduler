@@ -118,11 +118,7 @@ function SignInPage() {
               <Link to="/signup" className="font-medium text-primary hover:underline">
                 Create account
               </Link>
-            </div>
-
-            <p className="text-center text-xs text-muted-foreground/60">
-              This is a portfolio demo. No real authentication.
-            </p>
+            </div>  
           </div>
         </div>
       </div>

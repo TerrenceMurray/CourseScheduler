@@ -425,17 +425,19 @@ function Dashboard() {
             Here's an overview of your scheduling system.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
+          <Button variant="outline" asChild className="justify-center">
             <Link to="/app/courses">
               <Plus className="mr-2 size-4" />
-              Add Course
+              <span className="sm:hidden">Course</span>
+              <span className="hidden sm:inline">Add Course</span>
             </Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="justify-center">
             <Link to="/app/generate">
               <Sparkles className="mr-2 size-4" />
-              Generate Schedule
+              <span className="sm:hidden">Generate</span>
+              <span className="hidden sm:inline">Generate Schedule</span>
             </Link>
           </Button>
         </div>
