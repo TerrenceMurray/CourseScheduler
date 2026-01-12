@@ -6,7 +6,7 @@ A full-stack web application for scheduling university courses into rooms with c
 
 Course Scheduler helps academic institutions manage their timetables by automatically assigning course sessions to available rooms while respecting constraints and preventing double-bookings. Built as a portfolio project demonstrating modern web development practices.
 
-**[Live Demo](https://course-scheduler.example.com)** · **[Source Code](https://github.com/TerrenceMurray/CourseScheduler)**
+**[Live Demo](https://scheduler.terrencemurray.work)** · **[Source Code](https://github.com/TerrenceMurray/CourseScheduler)**
 
 ## Features
 
