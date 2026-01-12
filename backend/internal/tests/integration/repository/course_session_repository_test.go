@@ -219,15 +219,19 @@ func (s *CourseSessionRepositorySuite) TestGetByCourseID_Empty() {
 
 // TestList
 func (s *CourseSessionRepositorySuite) TestList_Success() {
-	session1, _ := s.repo.Create(s.ctx, s.createTestSession())
-	session2, _ := s.repo.Create(s.ctx, s.createTestSession())
+	duration := int32(60)
+	numSessions := int32(2)
+	// Create sessions with different types to avoid unique constraint violation
+	session1, _ := s.repo.Create(s.ctx, models.NewCourseSession(uuid.New(), s.testCourse.ID, s.testRoomType.Name, "lecture", &duration, &numSessions, nil, nil))
+	session2, _ := s.repo.Create(s.ctx, models.NewCourseSession(uuid.New(), s.testCourse.ID, s.testRoomType.Name, "lab", &duration, &numSessions, nil, nil))
 
 	actual, err := s.repo.List(s.ctx)
 
 	s.Require().NoError(err)
 	s.Require().Len(actual, 2)
-	s.Require().Equal(session1.ID, actual[0].ID)
-	s.Require().Equal(session2.ID, actual[1].ID)
+	// Ordered by type ASC (enum position order: lab < lecture)
+	s.Require().Equal(session2.ID, actual[0].ID) // lab
+	s.Require().Equal(session1.ID, actual[1].ID) // lecture
 }
 
 func (s *CourseSessionRepositorySuite) TestList_Empty() {
