@@ -1,11 +1,11 @@
 package models
 
 import (
-	"errors"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/TerrenceMurray/course-scheduler/internal/validation"
 )
 
 type Building struct {
@@ -25,11 +25,7 @@ func NewBuilding(id uuid.UUID, name string, createdAt *time.Time, updatedAt *tim
 }
 
 func (b *Building) Validate() error {
-	if strings.TrimSpace(b.Name) == "" {
-		return errors.New("building name is required")
-	}
-
-	return nil
+	return validation.ValidateName(b.Name, validation.MaxNameLength)
 }
 
 // BuildingUpdate represents partial update fields for a Building.
@@ -38,9 +34,5 @@ type BuildingUpdate struct {
 }
 
 func (u *BuildingUpdate) Validate() error {
-	if u.Name != nil && strings.TrimSpace(*u.Name) == "" {
-		return errors.New("name cannot be empty")
-	}
-
-	return nil
+	return validation.ValidateOptionalName(u.Name, validation.MaxNameLength)
 }

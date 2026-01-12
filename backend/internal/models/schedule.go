@@ -2,10 +2,11 @@ package models
 
 import (
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/TerrenceMurray/course-scheduler/internal/validation"
 )
 
 // ScheduledSession represents a single scheduled session within a schedule
@@ -27,6 +28,9 @@ type Schedule struct {
 	CreatedAt  *time.Time         `json:"created_at,omitempty"`
 }
 
+// MaxScheduleSessions limits the number of sessions to prevent DoS
+const MaxScheduleSessions = 10000
+
 func NewSchedule(
 	id uuid.UUID,
 	name string,
@@ -44,12 +48,16 @@ func NewSchedule(
 }
 
 func (s *Schedule) Validate() error {
-	if strings.TrimSpace(s.Name) == "" {
-		return errors.New("schedule name is required")
+	if err := validation.ValidateName(s.Name, validation.MaxNameLength); err != nil {
+		return err
 	}
 
 	if len(s.Sessions) == 0 {
 		return errors.New("schedule must have at least one session")
+	}
+
+	if len(s.Sessions) > MaxScheduleSessions {
+		return errors.New("schedule exceeds maximum number of sessions")
 	}
 
 	for _, session := range s.Sessions {
@@ -70,13 +78,16 @@ type ScheduleUpdate struct {
 }
 
 func (u *ScheduleUpdate) Validate() error {
-	if u.Name != nil && strings.TrimSpace(*u.Name) == "" {
-		return errors.New("name cannot be empty")
+	if err := validation.ValidateOptionalName(u.Name, validation.MaxNameLength); err != nil {
+		return err
 	}
 
 	if u.Sessions != nil {
 		if len(u.Sessions) == 0 {
 			return errors.New("sessions cannot be empty")
+		}
+		if len(u.Sessions) > MaxScheduleSessions {
+			return errors.New("schedule exceeds maximum number of sessions")
 		}
 		for _, session := range u.Sessions {
 			if err := session.Validate(); err != nil {

@@ -17,11 +17,21 @@ FROM alpine:3.20
 
 RUN apk --no-cache add ca-certificates tzdata
 
+# Create non-root user for security
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
 WORKDIR /app
 
 # Copy binary and migrations
 COPY --from=builder /app/server .
 COPY --from=builder /app/migrations ./migrations
+
+# Set ownership to non-root user
+RUN chown -R appuser:appgroup /app
+
+# Switch to non-root user
+USER appuser
 
 EXPOSE 8080
 

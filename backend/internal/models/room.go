@@ -2,10 +2,11 @@ package models
 
 import (
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/TerrenceMurray/course-scheduler/internal/validation"
 )
 
 type Room struct {
@@ -39,11 +40,11 @@ func NewRoom(
 }
 
 func (r *Room) Validate() error {
-	if strings.TrimSpace(r.Name) == "" {
-		return errors.New("name is required")
+	if err := validation.ValidateName(r.Name, validation.MaxRoomNameLength); err != nil {
+		return err
 	}
 
-	if strings.TrimSpace(r.Type) == "" {
+	if err := validation.ValidateName(r.Type, validation.MaxNameLength); err != nil {
 		return errors.New("type is required")
 	}
 
@@ -63,11 +64,11 @@ type RoomUpdate struct {
 }
 
 func (u *RoomUpdate) Validate() error {
-	if u.Name != nil && strings.TrimSpace(*u.Name) == "" {
-		return errors.New("name cannot be empty")
+	if err := validation.ValidateOptionalName(u.Name, validation.MaxRoomNameLength); err != nil {
+		return err
 	}
 
-	if u.Type != nil && strings.TrimSpace(*u.Type) == "" {
+	if err := validation.ValidateOptionalName(u.Type, validation.MaxNameLength); err != nil {
 		return errors.New("type cannot be empty")
 	}
 

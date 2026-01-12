@@ -1,9 +1,9 @@
 package models
 
 import (
-	"errors"
-	"strings"
 	"time"
+
+	"github.com/TerrenceMurray/course-scheduler/internal/validation"
 )
 
 type RoomType struct {
@@ -25,22 +25,14 @@ func NewRoomType(
 }
 
 func (r *RoomType) Validate() error {
-	if strings.TrimSpace(r.Name) == "" {
-		return errors.New("name is required")
-	}
-
-	return nil
+	return validation.ValidateName(r.Name, validation.MaxNameLength)
 }
 
-// UpdateRoomType
+// UpdateRoomType represents partial update fields for a RoomType.
 type UpdateRoomType struct {
 	Name *string `json:"name,omitempty"`
 }
 
 func (u *UpdateRoomType) Validate() error {
-	if u.Name != nil && strings.TrimSpace(*u.Name) == "" {
-		return errors.New("name cannot be empty")
-	}
-
-	return nil
+	return validation.ValidateOptionalName(u.Name, validation.MaxNameLength)
 }

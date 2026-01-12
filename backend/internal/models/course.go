@@ -1,11 +1,11 @@
 package models
 
 import (
-	"errors"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/TerrenceMurray/course-scheduler/internal/validation"
 )
 
 type Course struct {
@@ -30,11 +30,7 @@ func NewCourse(
 }
 
 func (c *Course) Validate() error {
-	if strings.TrimSpace(c.Name) == "" {
-		return errors.New("name is required")
-	}
-
-	return nil
+	return validation.ValidateName(c.Name, validation.MaxNameLength)
 }
 
 // CourseUpdate represents partial update fields for a course.
@@ -43,9 +39,5 @@ type CourseUpdate struct {
 }
 
 func (u *CourseUpdate) Validate() error {
-	if u.Name != nil && strings.TrimSpace(*u.Name) == "" {
-		return errors.New("name cannot be empty")
-	}
-
-	return nil
+	return validation.ValidateOptionalName(u.Name, validation.MaxNameLength)
 }

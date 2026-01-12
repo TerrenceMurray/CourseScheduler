@@ -3,22 +3,31 @@ package middleware
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 )
 
 const UserIDKey contextKey = "user_id"
 const UserEmailKey contextKey = "user_email"
+const LoggerKey contextKey = "logger"
 
-func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
+// AuthMiddleware validates JWT tokens and extracts user information.
+// It uses structured logging via zap for security-relevant events.
+func AuthMiddleware(jwtSecret string, logger *zap.Logger) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reqID := middleware.GetReqID(r.Context())
+
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
-				log.Println("Auth: No Authorization header")
+				logger.Debug("auth: missing authorization header",
+					zap.String("request_id", reqID),
+					zap.String("path", r.URL.Path),
+				)
 				http.Error(w, "unauthorized: missing authorization header", http.StatusUnauthorized)
 				return
 			}
@@ -35,20 +44,30 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 			})
 
 			if err != nil {
-				log.Printf("Auth: Token parse error: %v", err)
+				logger.Debug("auth: token parse error",
+					zap.String("request_id", reqID),
+					zap.String("path", r.URL.Path),
+					zap.Error(err),
+				)
 				http.Error(w, "unauthorized: invalid token", http.StatusUnauthorized)
 				return
 			}
 
 			if !token.Valid {
-				log.Println("Auth: Token is not valid")
+				logger.Debug("auth: token not valid",
+					zap.String("request_id", reqID),
+					zap.String("path", r.URL.Path),
+				)
 				http.Error(w, "unauthorized: token not valid", http.StatusUnauthorized)
 				return
 			}
 
 			claims, ok := token.Claims.(jwt.MapClaims)
 			if !ok {
-				log.Println("Auth: Could not parse claims")
+				logger.Debug("auth: could not parse claims",
+					zap.String("request_id", reqID),
+					zap.String("path", r.URL.Path),
+				)
 				http.Error(w, "unauthorized: invalid claims", http.StatusUnauthorized)
 				return
 			}
@@ -56,7 +75,10 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 			// Extract user info from Supabase JWT claims
 			userID, ok := claims["sub"].(string)
 			if !ok {
-				log.Println("Auth: Missing 'sub' claim")
+				logger.Debug("auth: missing sub claim",
+					zap.String("request_id", reqID),
+					zap.String("path", r.URL.Path),
+				)
 				http.Error(w, "unauthorized: missing user id", http.StatusUnauthorized)
 				return
 			}
